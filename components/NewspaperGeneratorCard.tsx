@@ -1,5 +1,3 @@
-
-
 import React from 'react';
 import { Language, Category } from '../types';
 
@@ -51,10 +49,10 @@ const NewspaperGeneratorCard: React.FC<NewspaperGeneratorCardProps> = ({ onGener
               </svg>
             </div>
             <div className="flex-1">
-              <h3 className={`font-extrabold text-2xl ${isDisabled ? 'text-slate-500' : 'text-slate-800 dark:text-white'} mb-2 transition-colors`}>
+              <h3 className={`font-extrabold text-2xl ${isDisabled ? 'text-slate-500 dark:text-slate-300' : 'text-slate-800 dark:text-white'} mb-2 transition-colors`}>
                 {t[language].title}
               </h3>
-              <p className={`text-md leading-relaxed ${isDisabled ? 'text-slate-600' : 'text-slate-700 dark:text-slate-200'} transition-colors`}>
+              <p className={`text-md leading-relaxed ${isDisabled ? 'text-slate-600 dark:text-slate-300' : 'text-slate-700 dark:text-slate-200'} transition-colors`}>
                 {isDisabled
                   ? t[language].descDisabled
                   : t[language].descEnabled

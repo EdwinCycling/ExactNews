@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Chat } from '@google/genai';
-import { streamNewsAndSummaries, fetchFrontPageArticles, generateNewspaperImage, createChatSession, generateArticlesSummary } from './services/geminiService';
+import { streamNewsAndSummaries, fetchFrontPageArticles, createChatSession, generateArticlesSummary } from './services/geminiService';
 import { Article, AppState, SortOrder, Category, Language, ChatMessage } from './types';
 import Header from './components/Header';
 import ArticleCard from './components/ArticleCard';
@@ -147,7 +147,6 @@ const App: React.FC = () => {
   const [sortOrder, setSortOrder] = useState<SortOrder>(null);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);
 
-  const [newspaperImageUrl, setNewspaperImageUrl] = useState<string>('');
   const [newspaperArticles, setNewspaperArticles] = useState<Article[]>([]);
   const [newspaperLoadingState, setNewspaperLoadingState] = useState<{ step: 1 | 2; message: string; error?: string }>({ step: 1, message: '' });
   
@@ -368,7 +367,6 @@ const App: React.FC = () => {
     setSelectedCategory(null);
     setArticles([]);
     setNewspaperArticles([]);
-    setNewspaperImageUrl('');
     setAppState('idle');
     setSortOrder(null);
     setLoadingMessage('');
@@ -418,9 +416,8 @@ const App: React.FC = () => {
     }
 
     setView('newspaperLoading');
-    setNewspaperLoadingState({ step: 1, message: language === 'nl' ? "Stap 1/2: Belangrijkste nieuws verzamelen..." : "Step 1/2: Collecting top news..." });
+    setNewspaperLoadingState({ step: 1, message: language === 'nl' ? "Belangrijkste nieuws verzamelen..." : "Collecting top news..." });
     setNewspaperArticles([]);
-    setNewspaperImageUrl('');
     cancel();
 
     try {
@@ -430,17 +427,12 @@ const App: React.FC = () => {
         throw new Error(language === 'nl' ? "Geen recente artikelen gevonden om een voorpagina te maken. Probeer het morgen opnieuw." : "No recent articles found to create a front page. Please try again tomorrow.");
       }
       setNewspaperArticles(fetchedArticles);
-      
-      setNewspaperLoadingState({ step: 2, message: language === 'nl' ? "Stap 2/2: Hoofdafbeelding genereren met AI..." : "Step 2/2: Generating main image with AI..." });
-      
-      const imageUrl = await generateNewspaperImage(categoriesToFetch, language);
-      setNewspaperImageUrl(imageUrl);
       setView('newspaperView');
 
     } catch (error) {
       console.error("Error generating newspaper:", error);
       const message = error instanceof Error ? error.message : (language === 'nl' ? "Een onbekende fout is opgetreden." : "An unknown error has occurred.");
-      setNewspaperLoadingState(s => ({ ...s, error: message }));
+      setNewspaperLoadingState(s => ({ ...s, error: message, step: 1 }));
     }
   }, [language, cancel]);
 
@@ -763,7 +755,6 @@ const App: React.FC = () => {
       case 'newspaperLoading': return renderNewspaperLoadingView();
       case 'newspaperView': 
         return <NewspaperView 
-                 mainImageUrl={newspaperImageUrl} 
                  articles={newspaperArticles} 
                  onClose={handleGoBack}
                  language={language}

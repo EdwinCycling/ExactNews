@@ -16,6 +16,9 @@ const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLoading, 
 
   const articleSubtitle_nl = selectedCategory ? `Stel een vraag over de bovenstaande artikelen of over ${selectedCategory.title.nl}` : 'Stel een vraag over de bovenstaande artikelen.';
   const articleSubtitle_en = selectedCategory ? `Ask a question about the articles above or about ${selectedCategory.title.en}` : 'Ask a question about the articles above.';
+  
+  const expertSubtitle_nl = selectedCategory ? `Stel een vraag aan de ${selectedCategory.title.nl} expert.` : '';
+  const expertSubtitle_en = selectedCategory ? `Ask the ${selectedCategory.title.en} expert a question.` : '';
 
   const t = {
     nl: {
@@ -24,7 +27,7 @@ const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLoading, 
       placeholder: "Typ uw vraag...",
       send: "Verzenden",
       typing: "AI typt...",
-      disclaimer: "ED kan fouten maken, controleer altijd uw antwoord."
+      disclaimer: "ED kan fouten maken. Controleer belangrijke informatie."
     },
     en: {
       title: selectedCategory ? `Ask the ${selectedCategory.title.en} Expert` : "Ask the Data",
@@ -32,7 +35,7 @@ const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLoading, 
       placeholder: "Type your question...",
       send: "Send",
       typing: "AI is typing...",
-      disclaimer: "ED can make mistakes. Always check your answer."
+      disclaimer: "ED can make mistakes. Please check important information."
     }
   }
 
@@ -53,7 +56,7 @@ const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLoading, 
       <div className="p-4 border-b border-gray-200 dark:border-gray-700">
         <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200">{t[language].title}</h2>
         {t[language].subtitle && <p className="text-sm text-slate-500 dark:text-slate-400">{t[language].subtitle}</p>}
-        <div className="mt-2 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-500 bg-amber-500/10 dark:bg-amber-500/10 p-2 rounded-md">
+        <div className="mt-2 flex items-center gap-2 text-xs text-amber-700 dark:text-amber-500 bg-amber-100 dark:bg-amber-900/40 p-2 rounded-md border border-amber-500/20">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.21 3.03-1.742 3.03H4.42c-1.532 0-2.492-1.696-1.742-3.03l5.58-9.92zM10 13a1 1 0 110-2 1 1 0 010 2zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
           </svg>

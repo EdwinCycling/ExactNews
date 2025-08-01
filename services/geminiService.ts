@@ -280,56 +280,6 @@ export const fetchFrontPageArticles = async (categories: Category[], language: L
     }
 };
 
-export const generateNewspaperImage = async (categories: Category[], language: Language): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const model = 'imagen-3.0-generate-002';
-    
-    if (!categories || categories.length === 0) {
-        throw new Error(language === 'nl' ? "Kan geen afbeelding genereren zonder categorieën." : "Cannot generate image without categories.");
-    }
-    
-    const categoryNames = categories.map(c => c.title[language]).join(', ');
-
-    const prompt_nl = `
-      Creëer een conceptuele en professionele afbeelding die de algemene zakelijke thema's van de volgende categorieën visualiseert: ${categoryNames}.
-      Focus op een abstracte of metaforische representatie van bedrijfsgroei, technologie en data.
-      
-      Stijl: Fotorealistisch, redactioneel, hoge kwaliteit, modern, sfeervol, zakelijk.
-      Belangrijk: De afbeelding mag absoluut GEEN tekst, letters of logo's bevatten.
-    `;
-
-    const prompt_en = `
-      Create a conceptual and professional image visualizing the general business themes of the following categories: ${categoryNames}.
-      Focus on an abstract or metaphorical representation of business growth, technology, and data.
-
-      Style: Photorealistic, editorial, high quality, modern, atmospheric, corporate.
-      Important: The image must contain absolutely NO text, letters, or logos.
-    `;
-
-    const prompt = language === 'nl' ? prompt_nl : prompt_en;
-
-    try {
-        const response = await ai.models.generateImages({
-            model: model,
-            prompt: prompt,
-            config: {
-                numberOfImages: 1,
-                outputMimeType: 'image/jpeg',
-                aspectRatio: '16:9',
-            },
-        });
-    
-        if (response.generatedImages && response.generatedImages.length > 0) {
-            return response.generatedImages[0].image.imageBytes;
-        } else {
-            throw new Error(language === 'nl' ? "De AI kon geen hoofdafbeelding voor de krant genereren." : "The AI could not generate a main image for the newspaper.");
-        }
-    } catch(error) {
-        console.error("Error generating newspaper image:", error);
-        throw new Error(language === 'nl' ? "De AI kon geen hoofdafbeelding voor de krant genereren." : "The AI could not generate a main image for the newspaper.");
-    }
-};
-
 export const createChatSession = (category: Category, language: Language, contextData?: Article[]): Chat => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     

@@ -34,7 +34,7 @@ const Header: React.FC<HeaderProps> = ({ onGoHome, selectedCategory, isNewspaper
     }
   }
 
-  const title = isNewspaperView ? t[language].newspaperTitle : selectedCategory ? selectedCategory.title[language] : t[language].mainTitle;
+  const title = t[language].mainTitle;
   
   let subtitle: string;
   if (isNewspaperView) {
