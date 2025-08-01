@@ -280,33 +280,30 @@ export const fetchFrontPageArticles = async (categories: Category[], language: L
     }
 };
 
-export const generateNewspaperImage = async (articles: Article[], language: Language): Promise<string> => {
+export const generateNewspaperImage = async (categories: Category[], language: Language): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const model = 'imagen-3.0-generate-002';
     
-    if (!articles || articles.length === 0) {
-        throw new Error(language === 'nl' ? "Kan geen afbeelding genereren zonder artikelen." : "Cannot generate image without articles.");
+    if (!categories || categories.length === 0) {
+        throw new Error(language === 'nl' ? "Kan geen afbeelding genereren zonder categorieën." : "Cannot generate image without categories.");
     }
     
-    articles.sort((a, b) => b.rating - a.rating);
-    const mainArticle = articles[0];
+    const categoryNames = categories.map(c => c.title[language]).join(', ');
 
     const prompt_nl = `
-      Creëer een conceptuele en professionele afbeelding die het algemene thema van het volgende nieuwsartikel visualiseert. Focus op een abstracte of metaforische representatie, niet op een letterlijke uitbeelding.
-      Titel van het artikel: "${mainArticle.title}"
-      Samenvatting: "${mainArticle.summary}"
+      Creëer een conceptuele en professionele afbeelding die de algemene zakelijke thema's van de volgende categorieën visualiseert: ${categoryNames}.
+      Focus op een abstracte of metaforische representatie van bedrijfsgroei, technologie en data.
       
-      Stijl: Fotorealistisch, redactioneel, hoge kwaliteit, modern, sfeervol.
+      Stijl: Fotorealistisch, redactioneel, hoge kwaliteit, modern, sfeervol, zakelijk.
       Belangrijk: De afbeelding mag absoluut GEEN tekst, letters of logo's bevatten.
     `;
 
     const prompt_en = `
-        Create a conceptual and professional image that visualizes the general theme of the following news article. Focus on an abstract or metaphorical representation, not a literal depiction.
-        Article Title: "${mainArticle.title}"
-        Summary: "${mainArticle.summary}"
+      Create a conceptual and professional image visualizing the general business themes of the following categories: ${categoryNames}.
+      Focus on an abstract or metaphorical representation of business growth, technology, and data.
 
-        Style: Photorealistic, editorial, high quality, modern, atmospheric.
-        Important: The image must contain absolutely NO text, letters, or logos.
+      Style: Photorealistic, editorial, high quality, modern, atmospheric, corporate.
+      Important: The image must contain absolutely NO text, letters, or logos.
     `;
 
     const prompt = language === 'nl' ? prompt_nl : prompt_en;

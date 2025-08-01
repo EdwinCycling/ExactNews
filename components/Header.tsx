@@ -4,6 +4,7 @@ import ThemeSwitcher from './ThemeSwitcher';
 import LanguageSwitcher from './LanguageSwitcher';
 
 interface HeaderProps {
+  onGoHome: () => void;
   selectedCategory: Category | null;
   isNewspaperView?: boolean;
   isExpertChatView?: boolean;
@@ -13,7 +14,7 @@ interface HeaderProps {
   toggleLanguage: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ selectedCategory, isNewspaperView, isExpertChatView, language, theme, toggleTheme, toggleLanguage }) => {
+const Header: React.FC<HeaderProps> = ({ onGoHome, selectedCategory, isNewspaperView, isExpertChatView, language, theme, toggleTheme, toggleLanguage }) => {
   const t = {
     nl: {
       mainTitle: "Exact's Daily",
@@ -52,9 +53,11 @@ const Header: React.FC<HeaderProps> = ({ selectedCategory, isNewspaperView, isEx
     <header className="text-center mb-8">
       <div className="flex justify-between items-center">
         <div className="text-left flex-1">
-          <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-teal-400 via-blue-500 to-indigo-600 dark:from-teal-300 dark:via-blue-400 dark:to-indigo-500 bg-clip-text text-transparent">
-            {title}
-          </h1>
+          <button onClick={onGoHome} className="text-left focus:outline-none focus:ring-2 focus:ring-offset-4 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900 focus:ring-indigo-500 rounded-lg">
+            <h1 className="text-4xl sm:text-5xl font-extrabold tracking-tight bg-gradient-to-r from-teal-400 via-blue-500 to-indigo-600 dark:from-teal-300 dark:via-blue-400 dark:to-indigo-500 bg-clip-text text-transparent">
+              {title}
+            </h1>
+          </button>
         </div>
         <div className="flex items-center space-x-3">
           <LanguageSwitcher language={language} toggleLanguage={toggleLanguage} />

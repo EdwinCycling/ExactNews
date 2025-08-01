@@ -433,7 +433,7 @@ const App: React.FC = () => {
       
       setNewspaperLoadingState({ step: 2, message: language === 'nl' ? "Stap 2/2: Hoofdafbeelding genereren met AI..." : "Step 2/2: Generating main image with AI..." });
       
-      const imageUrl = await generateNewspaperImage(fetchedArticles, language);
+      const imageUrl = await generateNewspaperImage(categoriesToFetch, language);
       setNewspaperImageUrl(imageUrl);
       setView('newspaperView');
 
@@ -780,6 +780,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-transparent text-slate-800 dark:text-slate-200 font-sans">
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Header 
+          onGoHome={handleGoBack}
           selectedCategory={selectedCategory} 
           isNewspaperView={view === 'newspaperView' || view === 'newspaperLoading'}
           isExpertChatView={view === 'expertChat'}
