@@ -1,0 +1,6 @@
+{
+  "name": "Exact News Digest",
+  "description": "An intelligent news reader that fetches the latest AI news from the internet, summarizes each article, and presents them in a single, elegant overview.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}
