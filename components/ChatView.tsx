@@ -12,14 +12,12 @@ interface ChatViewProps {
 
 const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLoading, language, selectedCategory, isExpertMode = false }) => {
   const [input, setInput] = useState('');
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const articleSubtitle_nl = selectedCategory ? `Stel een vraag over de bovenstaande artikelen of over ${selectedCategory.title.nl}` : 'Stel een vraag over de bovenstaande artikelen.';
   const articleSubtitle_en = selectedCategory ? `Ask a question about the articles above or about ${selectedCategory.title.en}` : 'Ask a question about the articles above.';
   
-  const expertSubtitle_nl = selectedCategory ? `Stel een vraag aan de ${selectedCategory.title.nl} expert.` : '';
-  const expertSubtitle_en = selectedCategory ? `Ask the ${selectedCategory.title.en} expert a question.` : '';
-
   const t = {
     nl: {
       title: selectedCategory ? `Vraag het de ${selectedCategory.title.nl} expert` : "Vraag het de Data",
@@ -27,7 +25,9 @@ const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLoading, 
       placeholder: "Typ uw vraag...",
       send: "Verzenden",
       typing: "AI typt...",
-      disclaimer: "ED kan fouten maken. Controleer belangrijke informatie."
+      disclaimer: "ED kan fouten maken. Controleer belangrijke informatie.",
+      copy: "Kopieer tekst",
+      copied: "Gekopieerd!",
     },
     en: {
       title: selectedCategory ? `Ask the ${selectedCategory.title.en} Expert` : "Ask the Data",
@@ -35,7 +35,9 @@ const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLoading, 
       placeholder: "Type your question...",
       send: "Send",
       typing: "AI is typing...",
-      disclaimer: "ED can make mistakes. Please check important information."
+      disclaimer: "ED can make mistakes. Please check important information.",
+      copy: "Copy text",
+      copied: "Copied!",
     }
   }
 
@@ -49,6 +51,42 @@ const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLoading, 
       onSendMessage(input);
       setInput('');
     }
+  };
+
+  const handleCopy = (text: string, index: number) => {
+    navigator.clipboard.writeText(text);
+    setCopiedIndex(index);
+    setTimeout(() => {
+      setCopiedIndex(null);
+    }, 2000);
+  };
+
+  const renderMessageContent = (text: string) => {
+    return text.split('\n').map((line, i) => {
+      // Handle bullet points
+      if (line.startsWith('## ')) {
+        const bulletContent = line.substring(3);
+        // Handle bold inside bullet
+        return (
+          <div key={i} className="flex items-start">
+            <span className="mr-2 mt-1 font-bold text-teal-600 dark:text-teal-400">•</span>
+            <span>
+              {bulletContent.split(/(\*\*.*?\*\*)/g).map((part, j) =>
+                part.startsWith('**') ? <strong key={j}>{part.slice(2, -2)}</strong> : part
+              )}
+            </span>
+          </div>
+        );
+      }
+      // Handle bold in regular line
+      return (
+        <div key={i}>
+          {line.split(/(\*\*.*?\*\*)/g).map((part, j) =>
+            part.startsWith('**') ? <strong key={j}>{part.slice(2, -2)}</strong> : part
+          )}
+        </div>
+      );
+    });
   };
 
   return (
@@ -69,15 +107,36 @@ const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLoading, 
             {msg.role === 'model' && (
               <span className="flex-shrink-0 w-8 h-8 rounded-full bg-teal-400 dark:bg-teal-500 flex items-center justify-center text-white font-bold text-sm">ED</span>
             )}
-            <div className={`max-w-md p-3 rounded-lg ${msg.role === 'user' ? 'bg-indigo-500 text-white' : 'bg-slate-200 dark:bg-gray-700 text-slate-800 dark:text-slate-200'}`}>
-              <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{msg.parts[0].text}</p>
+            <div className={`max-w-md rounded-lg ${msg.role === 'user' ? 'bg-indigo-500 text-white' : 'bg-slate-200 dark:bg-gray-700 text-slate-800 dark:text-slate-200'}`}>
+              <div className="p-3 text-sm leading-relaxed">
+                {msg.role === 'model' ? renderMessageContent(msg.parts[0].text) : <p>{msg.parts[0].text}</p>}
+              </div>
+              {msg.role === 'model' && history.length > 0 && (
+                <div className="border-t border-slate-300 dark:border-gray-600 px-3 py-1 text-right">
+                  <button
+                    onClick={() => handleCopy(msg.parts[0].text, index)}
+                    className="p-1 rounded-md text-slate-400 hover:bg-slate-300 dark:hover:bg-gray-600 transition-colors"
+                    title={copiedIndex === index ? t[language].copied : t[language].copy}
+                  >
+                    {copiedIndex === index ? (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-green-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                      </svg>
+                    ) : (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
              {msg.role === 'user' && (
               <span className="flex-shrink-0 w-8 h-8 rounded-full bg-indigo-500 dark:bg-indigo-600 flex items-center justify-center text-white font-bold text-sm">U</span>
             )}
           </div>
         ))}
-        {isLoading && (
+        {isLoading && history[history.length -1]?.role === 'user' && (
           <div className="flex items-start gap-3">
             <span className="flex-shrink-0 w-8 h-8 rounded-full bg-teal-400 dark:bg-teal-500 flex items-center justify-center text-white font-bold text-sm">ED</span>
             <div className="max-w-md p-3 rounded-lg bg-slate-200 dark:bg-gray-700 text-slate-800 dark:text-slate-200">
