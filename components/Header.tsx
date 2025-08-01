@@ -8,13 +8,14 @@ interface HeaderProps {
   selectedCategory: Category | null;
   isNewspaperView?: boolean;
   isExpertChatView?: boolean;
+  isInfoView?: boolean;
   language: Language;
   theme: string;
   toggleTheme: () => void;
   toggleLanguage: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onGoHome, selectedCategory, isNewspaperView, isExpertChatView, language, theme, toggleTheme, toggleLanguage }) => {
+const Header: React.FC<HeaderProps> = ({ onGoHome, selectedCategory, isNewspaperView, isExpertChatView, isInfoView, language, theme, toggleTheme, toggleLanguage }) => {
   const t = {
     nl: {
       mainTitle: "Exact's Daily",
@@ -64,7 +65,7 @@ const Header: React.FC<HeaderProps> = ({ onGoHome, selectedCategory, isNewspaper
           <ThemeSwitcher theme={theme} toggleTheme={toggleTheme} language={language} />
         </div>
       </div>
-      {!isExpertChatView && (
+      {!isExpertChatView && !isInfoView && (
        <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-600 dark:text-slate-400 text-left">
         {subtitle}
       </p>

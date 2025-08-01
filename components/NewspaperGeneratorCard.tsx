@@ -33,11 +33,11 @@ const NewspaperGeneratorCard: React.FC<NewspaperGeneratorCardProps> = ({ onGener
   const tooltipText = isDisabled ? t[language].tooltipDisabled : t[language].tooltipEnabled;
   
   return (
-     <div className="md:col-span-2 lg:col-span-3" title={tooltipText}>
+     <div title={tooltipText}>
         <button
           onClick={onGenerate}
           disabled={isDisabled}
-          className="flex flex-col text-left bg-gradient-to-br from-teal-500/40 to-indigo-500/40 backdrop-blur-sm border-2 border-teal-400/80 rounded-xl shadow-2xl transition-all duration-300 ease-in-out hover:border-teal-300 hover:shadow-teal-400/20 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-400 w-full p-6 disabled:opacity-50 disabled:cursor-not-allowed disabled:border-gray-600 disabled:hover:border-gray-600 disabled:shadow-none disabled:hover:-translate-y-0"
+          className="flex flex-col text-left bg-gradient-to-br from-teal-500/40 to-indigo-500/40 backdrop-blur-sm border-2 border-teal-400/80 rounded-xl shadow-2xl transition-all duration-300 ease-in-out hover:border-teal-300 hover:shadow-teal-400/20 hover:-translate-y-1 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-400 w-full p-6 disabled:opacity-50 disabled:cursor-not-allowed disabled:border-gray-600 disabled:hover:border-gray-600 disabled:shadow-none disabled:hover:-translate-y-0 h-full"
           aria-label={tooltipText}
           aria-disabled={isDisabled}
         >

@@ -30,8 +30,3 @@ export interface ChatMessage {
   role: ChatRole;
   parts: [{ text: string }];
 }
-
-export interface TurnoverDataPoint {
-  period: string;
-  turnoverIndex: number;
-}

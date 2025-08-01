@@ -42,6 +42,10 @@ export const useTextToSpeech = ({ language, onBoundary, onEnd }: TextToSpeechOpt
       utterance.voice = selectedVoice;
     }
 
+    // Make the voice more human-like
+    utterance.rate = 0.9; // A little slower than the default
+    utterance.pitch = 1; // Normal pitch
+
     utterance.onstart = () => {
         setIsSpeaking(true);
         onBoundary(item.id);

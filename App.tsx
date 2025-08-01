@@ -10,6 +10,8 @@ import SortControls from './components/SortControls';
 import NewspaperView from './components/NewspaperView';
 import CategoryCard from './components/CategoryCard';
 import NewspaperGeneratorCard from './components/NewspaperGeneratorCard';
+import InfoCard from './components/InfoCard';
+import InfoView from './components/InfoView';
 import ChatView from './components/ChatView';
 import CookieConsentToast from './components/CookieConsentToast';
 import { getCookie, setCookie, deleteCookie } from './services/cookieUtils';
@@ -135,7 +137,7 @@ const CATEGORIES: Category[] = [
 ];
 
 const App: React.FC = () => {
-  type View = 'categories' | 'articles' | 'newspaperLoading' | 'newspaperView' | 'expertChat';
+  type View = 'categories' | 'articles' | 'newspaperLoading' | 'newspaperView' | 'expertChat' | 'info';
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [view, setView] = useState<View>('categories');
   
@@ -360,6 +362,10 @@ const App: React.FC = () => {
     setView('expertChat');
     cancel(); // Stop any ongoing speech
   };
+  
+  const handleShowInfo = () => {
+    setView('info');
+  }
 
   const handleGoBack = () => {
     cancel();
@@ -528,13 +534,20 @@ const App: React.FC = () => {
 
   const renderCategoryView = () => (
     <div className="mt-12">
+      <div className="grid lg:grid-cols-6 gap-6 mb-6">
+        <div className="lg:col-span-5">
+            <NewspaperGeneratorCard 
+              onGenerate={handleGenerateFrontPage} 
+              isDisabled={favoriteCategories.size < 1}
+              language={language}
+              favoriteCategories={CATEGORIES.filter(c => favoriteCategories.has(c.key))}
+            />
+        </div>
+        <div className="lg:col-span-1">
+          <InfoCard onShowInfo={handleShowInfo} language={language} />
+        </div>
+      </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
-        <NewspaperGeneratorCard 
-          onGenerate={handleGenerateFrontPage} 
-          isDisabled={favoriteCategories.size < 1}
-          language={language}
-          favoriteCategories={CATEGORIES.filter(c => favoriteCategories.has(c.key))}
-        />
         {CATEGORIES.map(cat => (
           <CategoryCard 
              key={cat.key} 
@@ -701,7 +714,6 @@ const App: React.FC = () => {
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
-        <span className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-xl font-bold text-slate-700 dark:text-slate-300">{newspaperLoadingState.step}/2</span>
       </div>
       <p className="text-slate-700 dark:text-slate-300 text-xl mt-6 animate-pulse">{newspaperLoadingState.message}</p>
       {newspaperLoadingState.error && (
@@ -747,11 +759,16 @@ const App: React.FC = () => {
     </>
   );
 
+  const renderInfoView = () => (
+    <InfoView onGoBack={handleGoBack} language={language} />
+  );
+
   const renderContent = () => {
     switch(view) {
       case 'categories': return renderCategoryView();
       case 'articles': return renderArticleView();
       case 'expertChat': return renderExpertChatView();
+      case 'info': return renderInfoView();
       case 'newspaperLoading': return renderNewspaperLoadingView();
       case 'newspaperView': 
         return <NewspaperView 
@@ -775,6 +792,7 @@ const App: React.FC = () => {
           selectedCategory={selectedCategory} 
           isNewspaperView={view === 'newspaperView' || view === 'newspaperLoading'}
           isExpertChatView={view === 'expertChat'}
+          isInfoView={view === 'info'}
           language={language}
           theme={theme}
           toggleTheme={toggleTheme}
