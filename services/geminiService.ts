@@ -1,9 +1,5 @@
-
-
-
-
 import { GoogleGenAI, Chat, Type } from "@google/genai";
-import { Article, Category, Language, TurnoverDataPoint } from '../types';
+import { Article, Category, Language } from '../types';
 
 interface StreamCallbacks {
   onArticle: (article: Article) => void;
@@ -337,39 +333,38 @@ export const generateNewspaperImage = async (articles: Article[], language: Lang
     }
 };
 
-export const createChatSession = (contextData: Article[] | TurnoverDataPoint[], category: Category, language: Language): Chat => {
+export const createChatSession = (category: Category, language: Language, contextData?: Article[]): Chat => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    let contextString = '';
-    if (category.isDataCategory && contextData.every(item => 'period' in item && 'turnoverIndex' in item)) {
-        const turnoverContext = contextData as TurnoverDataPoint[];
-        contextString = turnoverContext.map(d => `${d.period}: ${d.turnoverIndex}`).join('\n');
-    } else if (!category.isDataCategory) {
-        const articleContext = contextData as Article[];
-        contextString = articleContext.map(a => `- ${a.title}: ${a.summary}`).join('\n');
-    }
-
     const persona = (category.persona && category.persona[language]) 
       ? category.persona[language]
       : (language === 'nl' 
           ? `Jij bent een AI-expert op het gebied van "${category.title.nl}".`
           : `You are an AI expert in the field of "${category.title.en}".`);
           
-    const baseInstruction_nl = `Jouw primaire taak is om vragen te beantwoorden op basis van de volgende context. Baseer je antwoorden zo veel mogelijk op deze data. Als een vraag niet direct beantwoord kan worden met de context, mag je je algemene kennis over "${category.title.nl}" gebruiken. Als een vraag compleet irrelevant is voor de categorie, geef dan beleefd aan dat je alleen vragen over dit onderwerp kunt beantwoorden.`;
-    const baseInstruction_en = `Your primary task is to answer questions based on the following context. Base your answers on this data as much as possible. If a question cannot be answered directly using the context, you may use your general knowledge about "${category.title.en}". If a question is completely irrelevant to the category, politely state that you can only answer questions about this topic.`;
+    let systemInstruction: string;
 
-    const systemInstruction_nl = `${persona}
-      ${baseInstruction_nl}
-      De context is:\n\n${contextString}`;
+    if (contextData && contextData.length > 0) {
+      // With article context
+      const contextString = contextData.map(a => `- ${a.title}: ${a.summary}`).join('\n');
+      const baseInstruction_nl = `Jouw primaire taak is om vragen te beantwoorden op basis van de volgende context. Baseer je antwoorden zo veel mogelijk op deze data. Als een vraag niet direct beantwoord kan worden met de context, mag je je algemene kennis over "${category.title.nl}" gebruiken. Als een vraag compleet irrelevant is voor de categorie, geef dan beleefd aan dat je alleen vragen over dit onderwerp kunt beantwoorden.`;
+      const baseInstruction_en = `Your primary task is to answer questions based on the following context. Base your answers on this data as much as possible. If a question cannot be answered directly using the context, you may use your general knowledge about "${category.title.en}". If a question is completely irrelevant to the category, politely state that you can only answer questions about this topic.`;
 
-    const systemInstruction_en = `${persona}
-      ${baseInstruction_en}
-      The context is:\n\n${contextString}`;
+      systemInstruction = language === 'nl'
+        ? `${persona}\n\n${baseInstruction_nl}\n\nDe context is:\n\n${contextString}`
+        : `${persona}\n\n${baseInstruction_en}\n\nThe context is:\n\n${contextString}`;
+
+    } else {
+      // Without article context (Expert Chat mode)
+      const baseInstruction_nl = `Jouw taak is om vragen te beantwoorden als een expert in jouw vakgebied. Wees behulpzaam, informatief en blijf binnen je rol. Als een vraag compleet irrelevant is voor de categorie, geef dan beleefd aan dat je alleen vragen over dit onderwerp kunt beantwoorden.`;
+      const baseInstruction_en = `Your task is to answer questions as an expert in your field. Be helpful, informative, and stay in character. If a question is completely irrelevant to the category, politely state that you can only answer questions about this topic.`;
+      systemInstruction = `${persona}\n\n${language === 'nl' ? baseInstruction_nl : baseInstruction_en}`;
+    }
 
     const chat = ai.chats.create({
         model: 'gemini-2.5-flash',
         config: {
-            systemInstruction: language === 'nl' ? systemInstruction_nl : systemInstruction_en
+            systemInstruction: systemInstruction
         }
     });
     return chat;
@@ -425,111 +420,5 @@ export const generateArticlesSummary = async (articles: Article[], language: Lan
     } catch (error) {
         console.error(`Error generating articles summary:`, error);
         throw new Error(language === 'nl' ? "De AI kon geen samenvatting van de artikelen genereren." : "The AI could not generate a summary of the articles.");
-    }
-};
-
-export const fetchMkbTurnoverData = async (language: Language): Promise<TurnoverDataPoint[]> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const model = "gemini-2.5-flash";
-
-    // --- STEP 1: Fetch raw content from the URL ---
-    const contentFetchPrompt_nl = `
-        Ga naar de webpagina 'https://www.exact.com/nl/over-ons/mkb-monitor/omzet'.
-        Vind de grafiek of data met de titel 'Omzetontwikkeling mkb'.
-        Extraheer alle relevante data uit deze grafiek, inclusief kwartalen en omzetindexcijfers.
-        Retourneer de gevonden data als platte tekst.
-    `;
-    const contentFetchPrompt_en = `
-        Go to the webpage 'https://www.exact.com/nl/over-ons/mkb-monitor/omzet'.
-        Find the chart or data with the title 'Omzetontwikkeling mkb'.
-        Extract all relevant data from this chart, including quarters and turnover index figures.
-        Return the found data as plain text.
-    `;
-    const contentFetchPrompt = language === 'nl' ? contentFetchPrompt_nl : contentFetchPrompt_en;
-
-    let rawContent: string;
-    try {
-        const contentResponse = await ai.models.generateContent({
-            model: model,
-            contents: contentFetchPrompt,
-            config: {
-                tools: [{ googleSearch: {} }],
-                temperature: 0.0,
-            }
-        });
-        rawContent = contentResponse.text;
-        if (!rawContent || rawContent.length < 10) {
-            throw new Error("AI did not return any content from the URL.");
-        }
-    } catch (error) {
-        console.error(`Error fetching raw MKB data (Step 1):`, error);
-        throw new Error(language === 'nl' ? "De AI kon de data van de webpagina niet lezen." : "The AI could not read the data from the webpage.");
-    }
-    
-    // --- STEP 2: Extract JSON from the raw content ---
-    const jsonExtractionPrompt_nl = `
-        Analyseer de volgende tekst en extraheer de omzetgegevens per kwartaal.
-        Formatteer de uitvoer als een JSON-array, waarbij elk object een 'period' (string) en 'turnoverIndex' (getal) bevat.
-        Tekst:
-        ---
-        ${rawContent}
-        ---
-    `;
-    const jsonExtractionPrompt_en = `
-        Analyze the following text and extract the quarterly turnover data.
-        Format the output as a JSON array, where each object has a 'period' (string) and 'turnoverIndex' (number).
-        Text:
-        ---
-        ${rawContent}
-        ---
-    `;
-
-    const jsonExtractionPrompt = language === 'nl' ? jsonExtractionPrompt_nl : jsonExtractionPrompt_en;
-
-    const schema = {
-        type: Type.ARRAY,
-        items: {
-          type: Type.OBJECT,
-          properties: {
-            period: {
-              type: Type.STRING,
-              description: language === 'nl' ? 'Het kwartaal en jaar, bv. "Q1 2023"' : 'The quarter and year, e.g. "Q1 2023"'
-            },
-            turnoverIndex: {
-              type: Type.NUMBER,
-              description: language === 'nl' ? 'De omzetindex als getal' : 'The turnover index as a number'
-            }
-          },
-          required: ["period", "turnoverIndex"]
-        }
-    };
-    
-    try {
-        const jsonResponse = await ai.models.generateContent({
-            model: model,
-            contents: jsonExtractionPrompt,
-            config: {
-                temperature: 0.0,
-                responseMimeType: "application/json",
-                responseSchema: schema
-            }
-        });
-        
-        const cleanedText = jsonResponse.text.trim();
-        const parsedData: TurnoverDataPoint[] = JSON.parse(cleanedText);
-        
-        if (Array.isArray(parsedData)) {
-            // An empty array is a valid response, meaning no data was found.
-            // The UI is responsible for displaying a "no data" message.
-            return parsedData;
-        } else {
-            throw new Error(language === 'nl' ? 'De AI gaf een onjuist dataformaat terug (geen array).' : 'The AI returned an incorrect data format (not an array).');
-        }
-
-    } catch (error) {
-        console.error(`Error extracting JSON from MKB data (Step 2):`, error);
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        const finalMessage = (language === 'nl' ? "De AI kon de gelezen data niet omzetten naar een grafiek. " : "The AI could not convert the read data into a chart. ") + errorMessage;
-        throw new Error(finalMessage);
     }
 };

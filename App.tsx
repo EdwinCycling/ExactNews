@@ -1,10 +1,7 @@
-
-
-
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Chat } from '@google/genai';
-import { streamNewsAndSummaries, fetchFrontPageArticles, generateNewspaperImage, createChatSession, generateArticlesSummary, fetchMkbTurnoverData } from './services/geminiService';
-import { Article, AppState, SortOrder, Category, Language, ChatMessage, TurnoverDataPoint } from './types';
+import { streamNewsAndSummaries, fetchFrontPageArticles, generateNewspaperImage, createChatSession, generateArticlesSummary } from './services/geminiService';
+import { Article, AppState, SortOrder, Category, Language, ChatMessage } from './types';
 import Header from './components/Header';
 import ArticleCard from './components/ArticleCard';
 import ErrorMessage from './components/ErrorMessage';
@@ -17,7 +14,10 @@ import ChatView from './components/ChatView';
 import CookieConsentToast from './components/CookieConsentToast';
 import { getCookie, setCookie, deleteCookie } from './services/cookieUtils';
 import { useTextToSpeech } from './hooks/useTextToSpeech';
-import TurnoverChart from './components/TurnoverChart';
+import LoginScreen from './components/LoginScreen';
+
+// Plaintext secret code for maximum reliability in all environments.
+const SECRET_CODE = '8641';
 
 const CATEGORIES: Category[] = [
   {
@@ -29,23 +29,13 @@ const CATEGORIES: Category[] = [
       en: 'You are an enthusiastic AI specialist and tech evangelist. You speak with passion and deep knowledge about the latest trends and breakthroughs in artificial intelligence.'
     }
   },
-   {
-    key: 'mkb_monitor',
-    title: { nl: 'MKB Monitor', en: 'SME Monitor' },
-    description: { nl: 'Analyseer de meest recente omzetcijfers uit de MKB Monitor van Exact.', en: 'Analyze the latest turnover figures from the Exact SME Monitor.' },
-    isDataCategory: true,
-    persona: {
-      nl: 'Je bent een data-analist gespecialiseerd in de Nederlandse MKB-sector. Je interpreteert economische data en trends, met name de omzetcijfers van de Exact MKB Monitor, en legt deze uit in heldere taal.',
-      en: 'You are a data analyst specializing in the Dutch SME sector. You interpret economic data and trends, particularly the turnover figures from the Exact SME Monitor, and explain them in clear language.'
-    }
-  },
   {
     key: 'hr',
     title: { nl: 'HR en Salaris', en: 'HR and Payroll' },
     description: { nl: 'Automatiseer de complete HR-cyclus van vacature tot uitstroom.', en: 'Automate the complete HR cycle from vacancy to outflow.' },
     persona: {
-      nl: 'Je bent een professionele en empathische HR Business Partner. Je adviseert over strategische HR-onderwerpen, wet- en regelgeving en de impact van technologie op de werkvloer.',
-      en: 'You are a professional and empathetic HR Business Partner. You advise on strategic HR topics, laws and regulations, and the impact of technology on the workplace.'
+      nl: 'Je bent een professionele en empathische HR Business Partner en salaris expert. Je adviseert over strategische HR-onderwerpen, wet- en regelgeving en de impact van technologie op de werkvloer. Maar je weet ook alles van een loonrun en alle regeles en wetgeving dat daarvoor nodig is. Ook heb je diepe CAO kennis.',
+      en: 'You are a professional and empathetic HR Business Partner and payroll expert. You advise on strategic HR topics, laws and regulations, and the impact of technology on the workplace.But you also know everything about running payroll and all the rules and legislation required for it. You also have deep knowledge of collective labor agreements.'
     }
   },
   {
@@ -145,12 +135,12 @@ const CATEGORIES: Category[] = [
 ];
 
 const App: React.FC = () => {
-  type View = 'categories' | 'articles' | 'newspaperLoading' | 'newspaperView';
+  type View = 'categories' | 'articles' | 'newspaperLoading' | 'newspaperView' | 'expertChat';
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [view, setView] = useState<View>('categories');
   
   const [appState, setAppState] = useState<AppState>('idle');
   const [articles, setArticles] = useState<Article[]>([]);
-  const [turnoverData, setTurnoverData] = useState<TurnoverDataPoint[]>([]);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [progress, setProgress] = useState(0);
   const [loadingMessage, setLoadingMessage] = useState<string>('');
@@ -183,9 +173,7 @@ const App: React.FC = () => {
   const [theme, setTheme] = useState(() => {
     const savedTheme = getCookie('theme');
     if (savedTheme === 'dark' || savedTheme === 'light') return savedTheme;
-    if (typeof window !== 'undefined') {
-        return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-    }
+    // Default to light mode if no cookie is set.
     return 'light';
   });
 
@@ -206,11 +194,18 @@ const App: React.FC = () => {
   });
   
   useEffect(() => {
-    if (!cookieConsent) {
+    // Check session storage to bypass login if already authenticated in the same session
+    if (sessionStorage.getItem('isAuthenticated') === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!cookieConsent && isAuthenticated) {
       const timer = setTimeout(() => setShowCookieToast(true), 1500);
       return () => clearTimeout(timer);
     }
-  }, [cookieConsent]);
+  }, [cookieConsent, isAuthenticated]);
 
   useEffect(() => {
       const root = window.document.documentElement;
@@ -245,17 +240,12 @@ const App: React.FC = () => {
   }, [favoriteCategories, cookieConsent]);
 
   useEffect(() => {
-    if (view === 'articles' && appState === 'success' && selectedCategory) {
-        const context = selectedCategory.isDataCategory ? turnoverData : articles;
-        if (context.length > 0) {
-            const session = createChatSession(context, selectedCategory, language);
-            setChatSession(session);
-            setChatHistory([]);
-        }
-    } else {
-        setChatSession(null);
+    if (view === 'articles' && appState === 'success' && selectedCategory && articles.length > 0) {
+        const session = createChatSession(selectedCategory, language, articles);
+        setChatSession(session);
+        setChatHistory([]);
     }
-  }, [view, articles, turnoverData, appState, language, selectedCategory]);
+  }, [view, articles, appState, language, selectedCategory]);
 
   const handleToggleFavorite = useCallback((categoryKey: string) => {
     setFavoriteCategories(prevFavorites => {
@@ -289,9 +279,19 @@ const App: React.FC = () => {
       deleteCookie('language');
       deleteCookie('theme');
       deleteCookie('favoriteCategories');
+      sessionStorage.removeItem('isAuthenticated');
       window.location.reload();
     }
   }, [language]);
+  
+  const handleLoginAttempt = async (code: string): Promise<boolean> => {
+    if (code === SECRET_CODE) {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('isAuthenticated', 'true');
+      return true;
+    }
+    return false;
+  };
 
   const getNews = useCallback((category: Category) => {
     setView('articles');
@@ -299,7 +299,6 @@ const App: React.FC = () => {
     
     setAppState('loading');
     setArticles([]);
-    setTurnoverData([]);
     setErrorMessage('');
     setProgress(0);
     setSortOrder(null);
@@ -348,51 +347,26 @@ const App: React.FC = () => {
     });
   }, [language, cancel]);
   
-  const getMkbTurnoverData = useCallback(async (category: Category) => {
-    setView('articles');
-    setAppState('loading');
-    setArticles([]);
-    setTurnoverData([]);
-    setErrorMessage('');
-    setProgress(0);
-    setSortOrder(null);
-    setChatSession(null);
-    setChatHistory([]);
-    cancel();
-    setLoadingMessage(language === 'nl' ? 'De AI leest de grafiek en extraheert de data...' : 'The AI is reading the chart and extracting the data...');
-
-    try {
-        const data = await fetchMkbTurnoverData(language);
-        setTurnoverData(data);
-        setAppState('success');
-        setProgress(100);
-    } catch(err) {
-        console.error(err);
-        setErrorMessage(
-          (err as Error).message || (language === 'nl' ? 'Er is een onbekende fout opgetreden.' : 'An unknown error occurred.')
-        );
-        setAppState('error');
-    } finally {
-        setLoadingMessage('');
-    }
-  }, [language, cancel]);
-
   const handleSelectCategory = (category: Category) => {
     setSelectedCategory(category);
-    if (category.isDataCategory) {
-      getMkbTurnoverData(category);
-    } else {
-      getNews(category);
-    }
+    getNews(category);
   };
-
+  
+  const handleAskExpert = (category: Category) => {
+    setSelectedCategory(category);
+    setChatHistory([]);
+    // Create chat session without article context
+    const session = createChatSession(category, language);
+    setChatSession(session);
+    setView('expertChat');
+    cancel(); // Stop any ongoing speech
+  };
 
   const handleGoBack = () => {
     cancel();
     setView('categories');
     setSelectedCategory(null);
     setArticles([]);
-    setTurnoverData([]);
     setNewspaperArticles([]);
     setNewspaperImageUrl('');
     setAppState('idle');
@@ -478,7 +452,7 @@ const App: React.FC = () => {
   }, [favoriteCategories, generateNewspaper]);
 
   const handleGenerateNewspaperFromCategory = useCallback(() => {
-    if (!selectedCategory || selectedCategory.isDataCategory) return;
+    if (!selectedCategory) return;
     generateNewspaper([selectedCategory]);
   }, [selectedCategory, generateNewspaper]);
 
@@ -538,10 +512,10 @@ const App: React.FC = () => {
       generatingSummary: 'Samenvatting genereren...',
       noResultsTitle: 'Geen resultaten gevonden',
       noResultsBody: 'Er konden geen recente artikelen of reviews voor deze categorie worden gevonden. Probeer het later opnieuw of kies een andere categorie.',
-      noDataTitle: 'Geen data gevonden',
-      noDataBody: 'De AI kon de data niet uit de grafiek extraheren. De pagina is mogelijk gewijzigd. Probeer het later opnieuw.',
       footer: 'Nieuws sources door Gemini en Google Search',
       resetSettings: 'Reset instellingen & cookies',
+      speakingWith: 'In gesprek met de',
+      expert: 'Expert'
     },
     en: {
       backToCategories: 'Back to categories',
@@ -553,10 +527,10 @@ const App: React.FC = () => {
       generatingSummary: 'Generating summary...',
       noResultsTitle: 'No results found',
       noResultsBody: 'No recent articles or reviews could be found for this category. Please try again later or choose another category.',
-      noDataTitle: 'No data found',
-      noDataBody: 'The AI could not extract the data from the chart. The page may have changed. Please try again later.',
       footer: 'News sources by Gemini and Google Search',
       resetSettings: 'Reset settings & cookies',
+      speakingWith: 'Speaking with the',
+      expert: 'Expert'
     }
   }
 
@@ -567,12 +541,14 @@ const App: React.FC = () => {
           onGenerate={handleGenerateFrontPage} 
           isDisabled={favoriteCategories.size < 1}
           language={language}
+          favoriteCategories={CATEGORIES.filter(c => favoriteCategories.has(c.key))}
         />
         {CATEGORIES.map(cat => (
           <CategoryCard 
              key={cat.key} 
              category={cat} 
              onSelect={() => handleSelectCategory(cat)}
+             onAskExpert={() => handleAskExpert(cat)}
              isFavorite={favoriteCategories.has(cat.key)}
              onToggleFavorite={() => handleToggleFavorite(cat.key)}
              language={language}
@@ -595,7 +571,7 @@ const App: React.FC = () => {
            {t[language].backToCategories}
          </button>
 
-         {appState === 'success' && articles.length > 0 && !selectedCategory?.isDataCategory && (
+         {appState === 'success' && articles.length > 0 && (
            <div className="flex flex-wrap gap-4">
              {/* Full Podcast Button */}
               {nowPlaying === 'articles' ? (
@@ -645,7 +621,7 @@ const App: React.FC = () => {
                           </svg>
                       ) : (
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
-                              <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v3a2 2 0 01-2 2H4a2 2 0 01-2-2v-3z" />
+                              <path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v3a2 2 0 01-2-2H4a2 2 0 01-2-2v-3z" />
                           </svg>
                       )}
                       {isSummaryLoading ? t[language].generatingSummary : t[language].listenSummary}
@@ -676,7 +652,7 @@ const App: React.FC = () => {
         </div>
       )}
       
-      {appState === 'success' && articles.length > 0 && !selectedCategory?.isDataCategory && (
+      {appState === 'success' && articles.length > 0 && (
         <SortControls activeSort={sortOrder} onSortChange={setSortOrder} language={language} />
       )}
 
@@ -685,7 +661,7 @@ const App: React.FC = () => {
            <ErrorMessage message={errorMessage} onRetry={() => handleSelectCategory(selectedCategory!)} language={language} />
         )}
 
-        {appState === 'success' && articles.length === 0 && !selectedCategory?.isDataCategory && (
+        {appState === 'success' && articles.length === 0 && (
           <div className="text-center py-16 px-6 bg-slate-200/30 dark:bg-gray-800/30 rounded-lg">
             <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -697,19 +673,7 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {appState === 'success' && turnoverData.length === 0 && selectedCategory?.isDataCategory && (
-           <div className="text-center py-16 px-6 bg-slate-200/30 dark:bg-gray-800/30 rounded-lg">
-            <svg xmlns="http://www.w3.org/2000/svg" className="mx-auto h-12 w-12 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3v11.25A2.25 2.25 0 0 0 6 16.5h12A2.25 2.25 0 0 0 20.25 14.25V3M3.75 3H18M3.75 3v-1.5A2.25 2.25 0 0 1 6 0h12A2.25 2.25 0 0 1 20.25 1.5v1.5m-16.5 0h16.5" />
-            </svg>
-            <h3 className="mt-4 text-xl font-semibold text-slate-700 dark:text-slate-300">{t[language].noDataTitle}</h3>
-            <p className="mt-2 text-slate-500 dark:text-slate-400 max-w-md mx-auto">
-              {t[language].noDataBody}
-            </p>
-          </div>
-        )}
-
-        {articles.length > 0 && !selectedCategory?.isDataCategory && (
+        {articles.length > 0 && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-8">
             {sortedArticles.map((article, index) => (
               <ArticleCard 
@@ -722,12 +686,9 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {turnoverData.length > 0 && selectedCategory?.isDataCategory && (
-            <TurnoverChart data={turnoverData} language={language} theme={theme} />
-        )}
       </div>
       
-      {chatSession && (articles.length > 0 || turnoverData.length > 0) && appState === 'success' && (
+      {chatSession && articles.length > 0 && appState === 'success' && (
         <div className="mt-16">
           <ChatView 
             history={chatHistory} 
@@ -759,10 +720,46 @@ const App: React.FC = () => {
     </div>
   );
 
+  const renderExpertChatView = () => (
+    <>
+      <div className="my-6 flex justify-between items-center">
+        <button 
+          onClick={handleGoBack}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-slate-200/50 dark:bg-gray-700/50 hover:bg-slate-300 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900 focus:ring-indigo-500 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 mr-2" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
+          {t[language].backToCategories}
+        </button>
+      </div>
+      <div className="mb-8 p-6 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-l-4 border-teal-400 dark:border-teal-500 rounded-r-lg shadow-md">
+        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">
+          {t[language].speakingWith} {selectedCategory?.title[language]} {t[language].expert}
+        </h2>
+        <blockquote className="mt-2 italic text-slate-600 dark:text-slate-400">
+          "{selectedCategory?.persona?.[language]}"
+        </blockquote>
+      </div>
+
+      {chatSession && (
+        <ChatView 
+          history={chatHistory} 
+          onSendMessage={handleSendMessage}
+          isLoading={isChatLoading}
+          language={language}
+          selectedCategory={selectedCategory}
+          isExpertMode={true}
+        />
+      )}
+    </>
+  );
+
   const renderContent = () => {
     switch(view) {
       case 'categories': return renderCategoryView();
       case 'articles': return renderArticleView();
+      case 'expertChat': return renderExpertChatView();
       case 'newspaperLoading': return renderNewspaperLoadingView();
       case 'newspaperView': 
         return <NewspaperView 
@@ -775,12 +772,17 @@ const App: React.FC = () => {
     }
   }
 
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={handleLoginAttempt} language={language} />;
+  }
+
   return (
     <div className="min-h-screen bg-transparent text-slate-800 dark:text-slate-200 font-sans">
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Header 
           selectedCategory={selectedCategory} 
           isNewspaperView={view === 'newspaperView' || view === 'newspaperLoading'}
+          isExpertChatView={view === 'expertChat'}
           language={language}
           theme={theme}
           toggleTheme={toggleTheme}

@@ -6,26 +6,27 @@ import LanguageSwitcher from './LanguageSwitcher';
 interface HeaderProps {
   selectedCategory: Category | null;
   isNewspaperView?: boolean;
+  isExpertChatView?: boolean;
   language: Language;
   theme: string;
   toggleTheme: () => void;
   toggleLanguage: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ selectedCategory, isNewspaperView, language, theme, toggleTheme, toggleLanguage }) => {
+const Header: React.FC<HeaderProps> = ({ selectedCategory, isNewspaperView, isExpertChatView, language, theme, toggleTheme, toggleLanguage }) => {
   const t = {
     nl: {
-      mainTitle: "Exact's AI nieuwsoverzicht",
+      mainTitle: "Exact's Daily",
       newspaperTitle: "Exact's Daily",
-      defaultSubtitle: "Kies een categorie om het laatste nieuws te ontdekken, mogelijk gemaakt door E.D.",
+      defaultSubtitle: "Kies een categorie om het laatste nieuws te ontdekken, maak een interactieve krant of chat met een echte expert.",
       newspaperSubtitle: "Uw gepersonaliseerde voorpagina, gegenereerd met AI, mogelijk gemaakt door E.D.",
       reviewSubtitle: "Analyse van de meest recente gebruikersreviews, mogelijk gemaakt door E.D.",
       categorySubtitle: (title: string) => `Uw dagelijkse briefing over de nieuwste ontwikkelingen in ${title.toLowerCase()}, mogelijk gemaakt door E.D.`
     },
     en: {
-      mainTitle: "Exact's AI News Digest",
+      mainTitle: "Exact's Daily",
       newspaperTitle: "Exact's Daily",
-      defaultSubtitle: "Choose a category to discover the latest news, powered by E.D.",
+      defaultSubtitle: "Choose a category to discover the latest news, create an interactive newspaper, or chat with a real expert.",
       newspaperSubtitle: "Your personalized front page, generated with AI, powered by E.D.",
       reviewSubtitle: "Analysis of the most recent user reviews, powered by E.D.",
       categorySubtitle: (title: string) => `Your daily briefing on the latest developments in ${title.toLowerCase()}, powered by E.D.`
@@ -60,9 +61,11 @@ const Header: React.FC<HeaderProps> = ({ selectedCategory, isNewspaperView, lang
           <ThemeSwitcher theme={theme} toggleTheme={toggleTheme} language={language} />
         </div>
       </div>
+      {!isExpertChatView && (
        <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-600 dark:text-slate-400 text-left">
         {subtitle}
       </p>
+      )}
     </header>
   );
 };

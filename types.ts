@@ -9,11 +9,6 @@ export interface Article {
   sourceName: string;
 }
 
-export interface TurnoverDataPoint {
-  period: string; // e.g., "Q1 2022"
-  turnoverIndex: number;
-}
-
 export type Language = 'en' | 'nl';
 
 export interface Category {
@@ -22,7 +17,6 @@ export interface Category {
   description: { [key in Language]: string };
   searchQuery?: { [key in Language]: string };
   isReviewCategory?: boolean;
-  isDataCategory?: boolean;
   persona?: { [key in Language]: string };
 }
 
@@ -35,4 +29,9 @@ export type ChatRole = 'user' | 'model';
 export interface ChatMessage {
   role: ChatRole;
   parts: [{ text: string }];
+}
+
+export interface TurnoverDataPoint {
+  period: string;
+  turnoverIndex: number;
 }
