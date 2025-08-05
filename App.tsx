@@ -1,7 +1,8 @@
+
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Chat } from '@google/genai';
-import { streamNewsAndSummaries, fetchFrontPageArticles, createChatSession, generateArticlesSummary } from './services/geminiService';
-import { Article, AppState, SortOrder, Category, Language, ChatMessage } from './types';
+import { streamNewsAndSummaries, fetchFrontPageArticles, createChatSession, generateArticlesSummary, generateChatSummaryAndActions } from './services/geminiService';
+import { Article, AppState, SortOrder, Category, Language, ChatMessage, RoleTemplate, ChatSummary } from './types';
 import Header from './components/Header';
 import ArticleCard from './components/ArticleCard';
 import ErrorMessage from './components/ErrorMessage';
@@ -17,6 +18,9 @@ import CookieConsentToast from './components/CookieConsentToast';
 import { getCookie, setCookie, deleteCookie } from './services/cookieUtils';
 import { useTextToSpeech } from './hooks/useTextToSpeech';
 import LoginScreen from './components/LoginScreen';
+import CpoRoleSetupView from './components/CpoRoleSetupView';
+import CpoRoleChatView from './components/CpoRoleChatView';
+import CpoChatPrintView from './components/CpoChatPrintView';
 
 // Plaintext secret code for maximum reliability in all environments.
 const SECRET_CODE = '8641';
@@ -124,20 +128,29 @@ const CATEGORIES: Category[] = [
     }
   },
   {
-    key: 'exact_reviews',
-    title: { nl: 'Exact Gebruikersreviews', en: 'Exact User Reviews' },
-    description: { nl: 'Analyse van de meest recente gebruikersreviews van Exact op Kiyoh.', en: 'Analysis of the most recent user reviews of Exact on Kiyoh.' },
-    searchQuery: { nl: 'recente gebruikersreviews over Exact van kiyoh.com', en: 'recent user reviews about Exact from kiyoh.com' },
-    isReviewCategory: true,
-    persona: {
-      nl: 'Je bent een klantgerichte Product Manager. Je analyseert gebruikersfeedback om de stem van de klant te begrijpen. Je identificeert trends, pijnpunten en complimenten in de reviews.',
-      en: 'You are a customer-centric Product Manager. You analyze user feedback to understand the voice of the customer. You identify trends, pain points, and compliments in the reviews.'
-    }
-  },
+    key: 'cpo_role',
+    title: { nl: 'De CPO rol', en: 'The CPO Role' },
+    description: { nl: 'Stel een AI-expert samen door een categorie en een rol te kiezen voor een diepgaande strategiesessie.', en: 'Assemble an AI expert by choosing a category and a role for a deep strategy session.' },
+  }
+];
+
+const ROLES: RoleTemplate[] = [
+  { key: 'beginner', title: {nl: 'Beginnersgids', en: 'Beginner\'s Guide'}, text: { nl: 'Gedraag je als een expert met 20 jaar ervaring in {category}. Breek de kernprincipes op die een totale beginner moet begrijpen. Gebruik analogieën, stapsgewijze logica en vereenvoudig alles alsof ik een jonge student ben.', en: 'Pretend you are an expert with 20 years of experience in {category}. Break down the core principles a total beginner must understand. Use analogies, step-by-step logic, and simplify everything like I\'m a young student.' } },
+  { key: 'sparring_partner', title: {nl: 'Sparringpartner', en: 'Thought Partner'}, text: { nl: 'Fungeer als mijn persoonlijke sparringpartner met 20 jaar ervaring in {category}. Ik zal {mijn idee/probleem} beschrijven, en ik wil dat je elke aanname in twijfel trekt, blinde vlekken aanwijst en me helpt het te evolueren naar iets dat 10x beter is.', en: 'Act as my personal thought partner with 20 years of experience in {category}. I’ll describe {my idea/problem}, and I want you to question every assumption, point out blind spots, and help me evolve it into something 10x better.' } },
+  { key: 'copywriter', title: {nl: 'Copywriter', en: 'Copywriter'}, text: { nl: 'Je bent een copywriter van wereldklasse met 20 jaar ervaring in {category}. Help me mijn {landingspagina/salespitch/e-mail} te herschrijven om beter te converteren. Maak het krachtig, beknopt en overtuigend. Gebruik bewezen frameworks.', en: 'You\'re a world-class copywriter with 20 years of experience in {category}. Help me rewrite my {landing page/sales pitch/email} to convert better. Make it punchy, concise, and persuasive. Use proven frameworks.' } },
+  { key: 'it_manager', title: {nl: 'Nobelprijs-winnende IT-manager', en: 'Nobel-winning IT Manager'}, text: { nl: 'Gedraag je als een Nobelprijs-winnende IT-manager. Analyseer mijn ideeën, geef kritische feedback met voor- en nadelen, adviseer wat ik niet moet vergeten en help me de gaten in te vullen.', en: 'Act like a Nobel-winning IT manager. Analyze my ideas. give critical feedback with pros and cons and advice what not to forget and help me filling in gaps.' } },
+  { key: 'mentor', title: {nl: 'Startup Mentor', en: 'Startup Mentor'}, text: { nl: 'Wees mijn startup-mentor met 20 jaar ervaring in {category}. Ik heb dit idee: {idee}. Help me het te verfijnen, de markt te valideren, monetisatie-opties te ontdekken en een roadmap van MVP naar CashCow uit te stippelen.', en: 'Be my startup mentor with 20 years of experience in {category}. I have this idea: {idea}. Help me refine it, validate the market, uncover monetization options, and outline a roadmap from MVP to CashCow.' } },
+  { key: 'teacher', title: {nl: 'Leraar voor beginnende HBO-student', en: 'Teacher for a College Student'}, text: { nl: 'Leer me {elk complex onderwerp} alsof ik een beginnende HBO-student ben. Gebruik eenvoudige taal, metaforen en voorbeelden. Na elke uitleg, overhoor me om mijn begrip te controleren en het leren te versterken.', en: 'Teach me {any complex skill or topic} like I’m a first-year college student. Use simple language, metaphors, and examples. After each explanation, quiz me to check my understanding and reinforce learning.' } },
+  { key: 'ghostwriter', title: {nl: 'Ghostwriter', en: 'Ghostwriter'}, text: { nl: 'Je bent mijn ghostwriter. Verander deze ruwe opsomming in een impactvolle {LinkedIn-post / Twitter-thread / Medium-artikel}. Houd het boeiend, duidelijk en afgestemd op {doelgroep}.', en: 'You’re my ghostwriter. Turn this rough bullet outline into a high-impact {LinkedIn post / Twitter thread / Medium article}. Keep it engaging, clear, and tailored to {target audience}.' } },
+  { key: 'life_coach', title: {nl: 'Levenscoach', en: 'Life Coach'}, text: { nl: 'Gedraag je als mijn levenscoach. Ik voel me vastzitten omdat {beschrijf situatie}. Stel me 5 ongemakkelijke vragen om het kernprobleem te achterhalen. Geef me dan een bikkelhard actieplan om vooruit te komen.', en: 'Act like my life coach. I feel stuck because {describe situation}. Ask me 5 uncomfortable questions to uncover the root issue. Then give me a brutally honest action plan to move forward.' } },
+  { key: 'investor', title: {nl: 'Investeerder', en: 'Investor'}, text: { nl: 'Je bent een bikkelharde investeerder met 20 jaar ervaring in {category}. Ik pitch mijn ideeën. Haal ze onderuit. Wat is gebrekkig? Wat is veelbelovend? Wat ontbreekt er? Beoordeel het op markt-, product- en oprichter-fit. Geen opvulling, alleen echte feedback.', en: 'You’re a brutally honest investor with 20 years of experience in {category}. Pitch my ideas. Tear it apart. What’s flawed? What’s promising? What’s missing? Rate it on market, product, and founder fit. No fluff just real feedback.' } },
+  { key: 'strategist', title: {nl: 'Persoonlijke Strateeg', en: 'Personal Strategist'}, text: { nl: 'Ik heb een persoonlijke strategie nodig. Ik geef je mijn doel. Geef me een maandplan. Deel het op per week. Neem specifieke acties, mijlpalen en gewoonten op. Maak het realistisch maar uitdagend genoeg. Geef tips en mogelijke valkuilen.', en: 'I need a personal strategy. I give you my goal. Give me a month plan. Break it down by week. Include specific actions, milestones, and habits. Make it realistic but challenging enough. Give tips and possible pitfalls.' } },
+  { key: 'futurist', title: {nl: 'Futurist', en: 'Futurist'}, text: { nl: 'Gedraag je als een futurist in {category} met 25 jaar ervaring. Herken trends, voorspel wat komen gaat en leg uit hoe ik me vandaag kan voorbereiden of ervan kan profiteren. Help me de verborgen parels te vinden. Stel relevante vragen en neem de leiding.', en: 'Pretend you are a futurist in {category} with 25 years experience. Spot trends, predict what’s coming next, and explain how I can prepare or take advantage of it today. Help me find the hidden gems. Ask me relevant questions, take the lead.' } },
+  { key: 'ux_expert', title: {nl: 'UX & Creativiteit Expert', en: 'UX & Creativity Expert'}, text: { nl: 'Fungeer als een UX- & creativiteitsexpert van wereldklasse met 20 jaar ervaring in {category}. Ik zal mijn {idee/product/interface} beschrijven, en ik wil dat je het laat exploderen met creatieve mogelijkheden en toevoegingen. Trek elke ontwerpkeuze in twijfel, stel gedurfde UX-verbeteringen voor en inspireer me met 3-5 innovatieve richtingen die fris, intuïtief en verrukkelijk aanvoelen voor de gebruiker. Leg uit waarom elk idee kan werken en hoe het de gebruikerservaring beïnvloedt.', en: 'Act as a world-class UX & creativity expert with 20 years of experience in {category}. I’ll describe my {idea/product/interface}, and I want you to explode it with creative possibilities and additions. Question every design choice, suggest bold UX improvements, and inspire me with 3–5 innovative directions that feel fresh, intuitive, and delightful for the user. Explain why each idea could work and how it impacts the user experience.' } }
 ];
 
 const App: React.FC = () => {
-  type View = 'categories' | 'articles' | 'newspaperLoading' | 'newspaperView' | 'expertChat' | 'info';
+  type View = 'categories' | 'articles' | 'newspaperLoading' | 'newspaperView' | 'expertChat' | 'info' | 'cpoRoleSetup' | 'cpoRoleChat' | 'cpoChatPrint';
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [view, setView] = useState<View>('categories');
   
@@ -184,6 +197,13 @@ const App: React.FC = () => {
   const [nowPlaying, setNowPlaying] = useState<'articles' | 'summary' | null>(null);
   const [isSummaryLoading, setIsSummaryLoading] = useState<boolean>(false);
   const [speakingArticleUrl, setSpeakingArticleUrl] = useState<string | null>(null);
+
+  // CPO Role State
+  const [selectedCpoCategory, setSelectedCpoCategory] = useState<Category | null>(null);
+  const [selectedRole, setSelectedRole] = useState<RoleTemplate | null>(null);
+  const [chatSummary, setChatSummary] = useState<ChatSummary | null>(null);
+  const [isSummaryPanelLoading, setIsSummaryPanelLoading] = useState<boolean>(false);
+  const [isAdvancedMode, setIsAdvancedMode] = useState<boolean>(false);
   
   const { play, cancel } = useTextToSpeech({
     language,
@@ -242,7 +262,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (view === 'articles' && appState === 'success' && selectedCategory && articles.length > 0) {
-        const session = createChatSession(selectedCategory, language, articles);
+        const session = createChatSession({ category: selectedCategory, language, contextData: articles });
         setChatSession(session);
         setChatHistory([]);
     }
@@ -295,8 +315,7 @@ const App: React.FC = () => {
   };
 
   const getNews = useCallback((category: Category) => {
-    setView('articles');
-    const expectedCount = category.isReviewCategory ? 50 : 10;
+    const expectedCount = 10;
     
     setAppState('loading');
     setArticles([]);
@@ -307,16 +326,13 @@ const App: React.FC = () => {
     setChatHistory([]);
     cancel();
 
-    const message = category.isReviewCategory
-      ? (language === 'nl' ? `De AI analyseert tot ${expectedCount} gebruikersreviews...` : `The AI is analyzing up to ${expectedCount} user reviews...`)
-      : (language === 'nl' ? `De AI zoekt en analyseert het laatste nieuws over ${category.title[language].toLowerCase()}...` : `The AI is searching and analyzing the latest news about ${category.title[language].toLowerCase()}...`);
+    const message = (language === 'nl' ? `De AI zoekt en analyseert het laatste nieuws over ${category.title[language].toLowerCase()}...` : `The AI is searching and analyzing the latest news about ${category.title[language].toLowerCase()}...`);
     setLoadingMessage(message);
 
     let firstChunkReceived = false;
 
     streamNewsAndSummaries({
       topic: (category.searchQuery && category.searchQuery[language]) || category.title[language],
-      isReviewSearch: !!category.isReviewCategory,
       language: language,
       ignoreDateFilter: category.key === 'exact_news',
       onArticle: (article) => {
@@ -349,6 +365,12 @@ const App: React.FC = () => {
   }, [language, cancel]);
   
   const handleSelectCategory = (category: Category) => {
+    if (category.key === 'cpo_role') {
+        setView('cpoRoleSetup');
+        cancel();
+        return;
+    }
+    setView('articles');
     setSelectedCategory(category);
     getNews(category);
   };
@@ -357,7 +379,7 @@ const App: React.FC = () => {
     setSelectedCategory(category);
     setChatHistory([]);
     // Create chat session without article context
-    const session = createChatSession(category, language);
+    const session = createChatSession({ category, language });
     setChatSession(session);
     setView('expertChat');
     cancel(); // Stop any ongoing speech
@@ -378,23 +400,43 @@ const App: React.FC = () => {
     setLoadingMessage('');
     setChatSession(null);
     setChatHistory([]);
+    // Reset CPO state
+    setSelectedCpoCategory(null);
+    setSelectedRole(null);
+    setChatSummary(null);
+    setIsAdvancedMode(false);
   };
+
+  const handleReturnToCpoSetup = useCallback(() => {
+    cancel();
+    setView('cpoRoleSetup');
+    // Reset state for a new session configuration
+    setChatHistory([]);
+    setChatSummary(null);
+    setChatSession(null);
+    setSelectedCpoCategory(null);
+    setSelectedRole(null);
+    setIsAdvancedMode(false);
+  }, [cancel]);
   
   const handleSendMessage = useCallback(async (message: string) => {
     if (!chatSession) return;
 
     setIsChatLoading(true);
     const newUserMessage: ChatMessage = { role: 'user', parts: [{ text: message }] };
-    const modelPlaceholder: ChatMessage = { role: 'model', parts: [{ text: '' }] };
+    setChatHistory(prev => [...prev, newUserMessage]);
     
-    setChatHistory(prev => [...prev, newUserMessage, modelPlaceholder]);
-
     try {
       const stream = await chatSession.sendMessageStream({ message });
-      
       let modelResponseText = '';
+      let firstChunk = true;
 
       for await (const chunk of stream) {
+        if (firstChunk) {
+            const modelPlaceholder: ChatMessage = { role: 'model', parts: [{ text: '' }] };
+            setChatHistory(prev => [...prev, modelPlaceholder]);
+            firstChunk = false;
+        }
         modelResponseText += chunk.text;
         setChatHistory(prev => {
             const updatedModelMessage: ChatMessage = { role: 'model', parts: [{ text: modelResponseText }] };
@@ -404,13 +446,149 @@ const App: React.FC = () => {
     } catch (error) {
         console.error("Chat error:", error);
         const errorMessage: ChatMessage = { role: 'model', parts: [{ text: language === 'nl' ? 'Sorry, er is iets misgegaan.' : 'Sorry, something went wrong.' }] };
-        setChatHistory(prev => {
-          return [...prev.slice(0, -1), errorMessage];
-        });
+        setChatHistory(prev => [...prev, errorMessage]);
     } finally {
         setIsChatLoading(false);
     }
   }, [chatSession, language]);
+
+  const handleSendCpoMessage = useCallback(async (message: string) => {
+    const userMessagesCount = chatHistory.filter(msg => msg.role === 'user').length;
+    if (userMessagesCount >= 5) {
+      const alertMessage = language === 'nl' 
+        ? 'De limiet van 5 vragen is bereikt om de API-kosten beheersbaar te houden. Vraag uw werkgever om meer ruimte en doorvraagmogelijkheden.'
+        : 'The limit of 5 questions has been reached to keep API costs manageable. Please ask your employer for more capacity and deeper questioning capabilities.';
+      alert(alertMessage);
+      return;
+    }
+
+    if (!chatSession) return;
+
+    setIsChatLoading(true);
+    setChatSummary(prev => prev ? { ...prev, suggestedQuestion: '' } : null); // Clear previous suggestion
+    const newUserMessage: ChatMessage = { role: 'user', parts: [{ text: message }] };
+    const currentHistory = [...chatHistory, newUserMessage];
+    setChatHistory(currentHistory);
+
+    try {
+        const stream = await chatSession.sendMessageStream({ message });
+        let modelResponseText = '';
+        let finalHistory: ChatMessage[] = [];
+        let firstChunk = true;
+
+        for await (const chunk of stream) {
+            if (firstChunk) {
+                const modelPlaceholder: ChatMessage = { role: 'model', parts: [{ text: '' }] };
+                setChatHistory(prev => [...prev, modelPlaceholder]);
+                firstChunk = false;
+            }
+            modelResponseText += chunk.text;
+            setChatHistory(prev => {
+                const updatedModelMessage: ChatMessage = { role: 'model', parts: [{ text: modelResponseText }] };
+                finalHistory = [...prev.slice(0, -1), updatedModelMessage];
+                return finalHistory;
+            });
+        }
+        
+        setIsChatLoading(false);
+
+        // After getting the response, generate the summary
+        setIsSummaryPanelLoading(true);
+        try {
+            const summaryResult = await generateChatSummaryAndActions(finalHistory, language);
+            setChatSummary(summaryResult);
+        } catch (summaryError) {
+            console.error("Error generating summary:", summaryError);
+            // Optionally show an error in the summary panel
+        } finally {
+            setIsSummaryPanelLoading(false);
+        }
+
+    } catch (error) {
+        console.error("CPO Chat error:", error);
+        const errorMessage: ChatMessage = { role: 'model', parts: [{ text: language === 'nl' ? 'Sorry, er is iets misgegaan.' : 'Sorry, something went wrong.' }] };
+        setChatHistory(prev => [...prev, errorMessage]);
+        setIsChatLoading(false);
+        setIsSummaryPanelLoading(false);
+    }
+  }, [chatSession, language, chatHistory]);
+
+  const handleStartCpoChat = useCallback((category: Category, role: RoleTemplate) => {
+    setSelectedCpoCategory(category);
+    setSelectedRole(role);
+    setIsAdvancedMode(false); // Always start in friendly mode
+
+    const roleText = role.text[language].replace(/{category}/g, category.title[language]);
+    
+    const session = createChatSession({
+        category,
+        language,
+        overrideSystemInstruction: roleText,
+        isAdvanced: false
+    });
+    setChatSession(session);
+    setChatHistory([]);
+    setChatSummary(null);
+    setView('cpoRoleChat');
+  }, [language]);
+  
+  const handleSwitchCpoRole = useCallback((newRole: RoleTemplate) => {
+    if (!selectedCpoCategory || !chatSession) return;
+    
+    setSelectedRole(newRole);
+
+    const systemMessageText = language === 'nl' 
+      ? `[SYSTEM] Rol is gewijzigd naar ${newRole.title[language]}. De AI zal zich nu als deze expert gedragen.`
+      : `[SYSTEM] Role switched to ${newRole.title[language]}. The AI will now act as this expert.`;
+    
+    const systemMessage: ChatMessage = { role: 'model', parts: [{ text: systemMessageText }] };
+    const newHistory = [...chatHistory, systemMessage];
+    setChatHistory(newHistory);
+
+    const roleText = newRole.text[language].replace(/{category}/g, selectedCpoCategory.title[language]);
+    const newSession = createChatSession({
+        category: selectedCpoCategory,
+        language,
+        overrideSystemInstruction: roleText,
+        history: newHistory,
+        isAdvanced: isAdvancedMode,
+    });
+
+    setChatSession(newSession);
+
+  }, [chatHistory, selectedCpoCategory, language, chatSession, isAdvancedMode]);
+
+  const handleToggleAdvancedMode = useCallback(() => {
+    if (!selectedCpoCategory || !selectedRole || !chatSession) return;
+    const newIsAdvancedMode = !isAdvancedMode;
+    setIsAdvancedMode(newIsAdvancedMode);
+
+    const roleText = selectedRole.text[language].replace(/{category}/g, selectedCpoCategory.title[language]);
+
+    // Add a system message to inform user of the mode switch
+    const systemMessageText = language === 'nl'
+      ? `[SYSTEM] ${newIsAdvancedMode ? 'Geavanceerde Modus Geactiveerd.' : 'Standaard Modus Geactiveerd.'}`
+      : `[SYSTEM] ${newIsAdvancedMode ? 'Advanced Mode Activated.' : 'Standard Mode Activated.'}`;
+    const systemMessage: ChatMessage = { role: 'model', parts: [{ text: systemMessageText }] };
+    const newHistory = [...chatHistory, systemMessage];
+    setChatHistory(newHistory);
+
+    const newSession = createChatSession({
+        category: selectedCpoCategory,
+        language,
+        overrideSystemInstruction: roleText,
+        history: newHistory, // pass history with the new system message
+        isAdvanced: newIsAdvancedMode,
+    });
+    setChatSession(newSession);
+  }, [isAdvancedMode, selectedCpoCategory, selectedRole, language, chatHistory, chatSession]);
+
+  const handleAskSuggestedQuestion = useCallback((question: string) => {
+    if (question && !isChatLoading) {
+      handleSendCpoMessage(question);
+    }
+  }, [isChatLoading, handleSendCpoMessage]);
+
 
   const generateNewspaper = useCallback(async (categoriesToFetch: Category[]) => {
     if (categoriesToFetch.length === 0) {
@@ -444,7 +622,7 @@ const App: React.FC = () => {
 
 
   const handleGenerateFrontPage = useCallback(() => {
-    const selectedNewsCategories = CATEGORIES.filter(c => !c.isReviewCategory && favoriteCategories.has(c.key));
+    const selectedNewsCategories = CATEGORIES.filter(c => favoriteCategories.has(c.key));
      if (selectedNewsCategories.length < 1) return;
     generateNewspaper(selectedNewsCategories);
   }, [favoriteCategories, generateNewspaper]);
@@ -453,6 +631,10 @@ const App: React.FC = () => {
     if (!selectedCategory) return;
     generateNewspaper([selectedCategory]);
   }, [selectedCategory, generateNewspaper]);
+
+  const handlePrintCpoChat = useCallback(() => {
+      setView('cpoChatPrint');
+  }, []);
 
   const sortedArticles = useMemo(() => {
     if (sortOrder === null) return articles;
@@ -509,8 +691,8 @@ const App: React.FC = () => {
       stopSummary: 'Stop Samenvatting',
       generatingSummary: 'Samenvatting genereren...',
       noResultsTitle: 'Geen resultaten gevonden',
-      noResultsBody: 'Er konden geen recente artikelen of reviews voor deze categorie worden gevonden. Probeer het later opnieuw of kies een andere categorie.',
-      footer: 'Nieuws sources door Gemini en Google Search',
+      noResultsBody: 'Er konden geen recente artikelen voor deze categorie worden gevonden. Probeer het later opnieuw of kies een andere categorie.',
+      footer: 'Mogelijk gemaakt door de verschillende Gemini AI-modellen',
       resetSettings: 'Reset instellingen & cookies',
       speakingWith: 'In gesprek met de',
       expert: 'Expert'
@@ -524,8 +706,8 @@ const App: React.FC = () => {
       stopSummary: 'Stop Summary',
       generatingSummary: 'Generating summary...',
       noResultsTitle: 'No results found',
-      noResultsBody: 'No recent articles or reviews could be found for this category. Please try again later or choose another category.',
-      footer: 'News sources by Gemini and Google Search',
+      noResultsBody: 'No recent articles could be found for this category. Please try again later or choose another category.',
+      footer: 'Powered by the different Gemini AI models',
       resetSettings: 'Reset settings & cookies',
       speakingWith: 'Speaking with the',
       expert: 'Expert'
@@ -768,6 +950,9 @@ const App: React.FC = () => {
       case 'categories': return renderCategoryView();
       case 'articles': return renderArticleView();
       case 'expertChat': return renderExpertChatView();
+      case 'cpoRoleSetup': return <CpoRoleSetupView categories={CATEGORIES.filter(c => c.key !== 'exact_news' && c.key !== 'cpo_role' && c.key !== 'ai' && c.key !== 'competitors')} roles={ROLES} onStartChat={handleStartCpoChat} onGoBack={handleGoBack} language={language} />;
+      case 'cpoRoleChat': return <CpoRoleChatView onGoBack={handleReturnToCpoSetup} language={language} selectedCategory={selectedCpoCategory} selectedRole={selectedRole} chatHistory={chatHistory} onSendMessage={handleSendCpoMessage} onAskSuggestedQuestion={handleAskSuggestedQuestion} isChatLoading={isChatLoading} chatSummary={chatSummary} isSummaryPanelLoading={isSummaryPanelLoading} roles={ROLES} onSwitchRole={handleSwitchCpoRole} onPrint={handlePrintCpoChat} isAdvancedMode={isAdvancedMode} onToggleAdvancedMode={handleToggleAdvancedMode} />;
+      case 'cpoChatPrint': return <CpoChatPrintView onClose={() => setView('cpoRoleChat')} language={language} selectedCategory={selectedCpoCategory} selectedRole={selectedRole} chatHistory={chatHistory} chatSummary={chatSummary} />;
       case 'info': return renderInfoView();
       case 'newspaperLoading': return renderNewspaperLoadingView();
       case 'newspaperView': 
@@ -789,10 +974,12 @@ const App: React.FC = () => {
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Header 
           onGoHome={handleGoBack}
-          selectedCategory={selectedCategory} 
+          selectedCategory={selectedCategory ?? selectedCpoCategory} 
           isNewspaperView={view === 'newspaperView' || view === 'newspaperLoading'}
           isExpertChatView={view === 'expertChat'}
           isInfoView={view === 'info'}
+          isCpoSetupView={view === 'cpoRoleSetup'}
+          isCpoChatView={view === 'cpoRoleChat'}
           language={language}
           theme={theme}
           toggleTheme={toggleTheme}

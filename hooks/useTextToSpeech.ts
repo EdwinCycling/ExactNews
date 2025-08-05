@@ -6,34 +6,124 @@ interface SpeechQueueItem {
   id: string; // To identify which item is being spoken
 }
 
+interface SpeechQueueChunk {
+  text: string;
+  id: string;
+  isFirstChunk: boolean;
+}
+
 interface TextToSpeechOptions {
   language: Language;
-  onBoundary: (itemId: string) => void;
+  onBoundary: (itemId: string | null) => void;
   onEnd: () => void;
 }
 
+const sanitizeText = (text: string): string => {
+    if (!text) return '';
+    let sanitized = text;
+    // Remove markdown-like formatting that shouldn't be read
+    sanitized = sanitized.replace(/(\*\*|__|\*|_)/g, '');
+    // Replace "smart" quotes and other special characters with standard ones
+    sanitized = sanitized.replace(/[“”]/g, '"');
+    sanitized = sanitized.replace(/[‘’]/g, "'");
+    // Remove characters that can cause issues, like vertical tabs.
+    sanitized = sanitized.replace(/[\x0B]/g, ' ');
+    return sanitized.trim();
+};
+
+const chunkText = (text: string): string[] => {
+    if (!text) return [];
+
+    const chunks: string[] = [];
+    // A conservative maxLength to enhance stability across all browsers/voices.
+    const maxLength = 120;
+
+    // Split by common sentence terminators, but keep the terminator.
+    const sentences = text.match(/[^.!?]+[.!?]*|[^.!?]+$/g);
+
+    if (!sentences) {
+        return [];
+    }
+
+    sentences.forEach(sentence => {
+        const trimmedSentence = sentence.trim();
+        if (trimmedSentence.length === 0) return;
+
+        if (trimmedSentence.length <= maxLength) {
+            chunks.push(trimmedSentence);
+        } else {
+            // If a sentence is too long, chunk it by words
+            let currentChunk = '';
+            const words = trimmedSentence.split(/\s+/);
+            words.forEach(word => {
+                const chunkWithWord = currentChunk ? `${currentChunk} ${word}` : word;
+                if (chunkWithWord.length > maxLength) {
+                    if (currentChunk.length > 0) {
+                        chunks.push(currentChunk);
+                    }
+                    currentChunk = word;
+                } else {
+                    currentChunk = chunkWithWord;
+                }
+            });
+            if (currentChunk.length > 0) {
+                chunks.push(currentChunk);
+            }
+        }
+    });
+
+    return chunks.filter(c => c.trim().length > 0);
+};
+
 export const useTextToSpeech = ({ language, onBoundary, onEnd }: TextToSpeechOptions) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const queueRef = useRef<SpeechQueueItem[]>([]);
+  const queueRef = useRef<SpeechQueueChunk[]>([]);
+  const keepAliveIntervalRef = useRef<number | null>(null);
+  // Use a ref to prevent re-entrant calls to processQueue
+  const isProcessingRef = useRef<boolean>(false);
+
+  const stopKeepAlive = useCallback(() => {
+    if (keepAliveIntervalRef.current) {
+      window.clearInterval(keepAliveIntervalRef.current);
+      keepAliveIntervalRef.current = null;
+    }
+  }, []);
+
+  const fullReset = useCallback(() => {
+      stopKeepAlive();
+      queueRef.current = [];
+      setIsSpeaking(false);
+      isProcessingRef.current = false;
+      onBoundary(null);
+      // It's safer to explicitly cancel any lingering speech synthesis.
+      if (window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      onEnd();
+  }, [onEnd, stopKeepAlive, onBoundary]);
   
   const processQueue = useCallback(() => {
-    if (window.speechSynthesis.speaking) {
-      return;
+    if (isProcessingRef.current || window.speechSynthesis.speaking) {
+      return; // Already processing or speaking, wait for it to finish
     }
     if (queueRef.current.length === 0) {
-      setIsSpeaking(false);
-      onEnd();
+      fullReset();
       return;
     }
 
-    const item = queueRef.current.shift();
-    if (!item) return;
+    isProcessingRef.current = true;
+    const chunkItem = queueRef.current.shift();
+    if (!chunkItem || !chunkItem.text) {
+        isProcessingRef.current = false;
+        processQueue(); // Skip empty chunk
+        return;
+    };
 
-    const utterance = new SpeechSynthesisUtterance(item.text);
-    
-    const voices = window.speechSynthesis.getVoices();
+    const utterance = new SpeechSynthesisUtterance(chunkItem.text);
     const voiceLang = language === 'nl' ? 'nl-NL' : 'en-US';
+    const voices = window.speechSynthesis.getVoices();
     
+    // Prioritize Google voices as they are often higher quality
     let selectedVoice = voices.find(v => v.lang === voiceLang && v.name.includes('Google'));
     if (!selectedVoice) {
       selectedVoice = voices.find(v => v.lang === voiceLang);
@@ -42,57 +132,119 @@ export const useTextToSpeech = ({ language, onBoundary, onEnd }: TextToSpeechOpt
       utterance.voice = selectedVoice;
     }
 
-    // Make the voice more human-like
-    utterance.rate = 0.9; // A little slower than the default
-    utterance.pitch = 1; // Normal pitch
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
 
     utterance.onstart = () => {
-        setIsSpeaking(true);
-        onBoundary(item.id);
+      setIsSpeaking(true);
+      if (chunkItem.isFirstChunk) {
+        onBoundary(chunkItem.id);
+      }
+      // Start keep-alive. Some browsers (e.g., Chrome on some OS) stop speech after ~15s.
+      stopKeepAlive();
+      keepAliveIntervalRef.current = window.setInterval(() => {
+        if (window.speechSynthesis.speaking) {
+          window.speechSynthesis.pause();
+          window.speechSynthesis.resume();
+        }
+      }, 12000); // Pulse every 12 seconds
     };
 
     utterance.onend = () => {
-      processQueue();
+      isProcessingRef.current = false;
+      // Short delay to allow the speech engine to settle before the next utterance.
+      setTimeout(() => processQueue(), 100); 
     };
     
     utterance.onerror = (event) => {
-        console.error("SpeechSynthesisUtterance.onerror", event);
-        queueRef.current = [];
-        setIsSpeaking(false);
-        onEnd();
+      console.error("SpeechSynthesisUtterance.onerror event object:", event);
+      console.error("Speech synthesis error details:", {
+            error: event.error,
+            textChunk: chunkItem.text.substring(0, 50) + '...',
+            language: language,
+            voice: utterance.voice?.name || 'default',
+      });
+      // A full reset is the safest way to recover from an error.
+      fullReset();
     };
 
     window.speechSynthesis.speak(utterance);
-  }, [language, onBoundary, onEnd]);
-
+  }, [language, onBoundary, fullReset, stopKeepAlive]);
 
   const play = useCallback((items: SpeechQueueItem[]) => {
-    if (items.length === 0 || window.speechSynthesis.speaking) return;
-    
-    const startSpeech = () => {
-      queueRef.current = [...items];
-      processQueue();
+    // Force a cancel and reset before starting anything new.
+    // This is the most reliable way to prevent overlapping speech requests.
+    if (window.speechSynthesis && window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+    }
+    fullReset();
+
+    if (!items || items.length === 0) {
+        return;
     }
     
+    const newQueue: SpeechQueueChunk[] = [];
+    items.forEach(item => {
+        const sanitizedText = sanitizeText(item.text);
+        const chunks = chunkText(sanitizedText);
+        if (chunks.length > 0) {
+            chunks.forEach((chunk, index) => {
+                newQueue.push({
+                    text: chunk,
+                    id: item.id,
+                    isFirstChunk: index === 0,
+                });
+            });
+        }
+    });
+
+    if (newQueue.length === 0) {
+        fullReset();
+        return;
+    }
+    
+    queueRef.current = newQueue;
+    setIsSpeaking(true); // Set speaking state immediately for UI feedback
+
+    // Wait for voices to be loaded if they aren't already
     if (window.speechSynthesis.getVoices().length === 0) {
-        window.speechSynthesis.onvoiceschanged = startSpeech;
+        window.speechSynthesis.onvoiceschanged = () => {
+            // Check if queue still exists, in case user cancelled in the meantime
+            if (queueRef.current.length > 0) processQueue();
+        }
     } else {
-        startSpeech();
+        processQueue();
     }
-  }, [processQueue]);
+  }, [processQueue, fullReset]);
 
   const cancel = useCallback(() => {
-    window.speechSynthesis.cancel();
-    queueRef.current = [];
-    setIsSpeaking(false);
-    onEnd();
-  }, [onEnd]);
+    fullReset();
+  }, [fullReset]);
 
+  // General cleanup on unmount
   useEffect(() => {
     return () => {
-      window.speechSynthesis.cancel();
+      if(window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      stopKeepAlive();
     };
-  }, []);
+  }, [stopKeepAlive]);
+
+  // A safety net to resume speech synthesis if it gets stuck when changing browser tabs
+  useEffect(() => {
+      const handleVisibilityChange = () => {
+          if (document.visibilityState === 'visible' && isSpeaking) {
+             if (window.speechSynthesis.paused) {
+                window.speechSynthesis.resume();
+             }
+          }
+      };
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      return () => {
+          document.removeEventListener('visibilitychange', handleVisibilityChange);
+      }
+  }, [isSpeaking]);
 
   return { play, cancel, isSpeaking };
 };

@@ -39,6 +39,11 @@ const features: Feature[] = [
     description: { nl: "Stel favoriete categorieën in, wissel tussen donkere/lichte modus en kies uw taal. Uw voorkeuren worden onthouden.", en: "Set favorite categories, switch between dark/light mode, and choose your language. Your preferences are saved." }
   },
   {
+    icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0-4-4m4 4-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>,
+    title: { nl: "Dynamische Rolwissel", en: "Dynamic Role Switching" },
+    description: { nl: "Wissel tijdens een CPO-strategiesessie naadloos van AI-expert. Krijg verschillende perspectieven op uw vraagstuk zonder de context van het gesprek te verliezen.", en: "Seamlessly switch AI experts during a CPO strategy session. Get different perspectives on your issue without losing the context of the conversation." }
+  },
+  {
     icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>,
     title: { nl: "Beveiligde Toegang", en: "Secure Access" },
     description: { nl: "Toegang tot de applicatie is beveiligd met een pincode om ongewenst gebruik te voorkomen.", en: "Access to the application is protected by a PIN code to prevent unauthorized usage." }

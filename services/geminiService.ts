@@ -1,5 +1,6 @@
-import { GoogleGenAI, Chat, Type } from "@google/genai";
-import { Article, Category, Language } from '../types';
+
+import { GoogleGenAI, Chat, Type, Content as GeminiChatMessage } from "@google/genai";
+import { Article, Category, Language, ChatMessage, ChatSummary, RoleTemplate, ReadingLink } from '../types';
 
 interface StreamCallbacks {
   onArticle: (article: Article) => void;
@@ -9,10 +10,99 @@ interface StreamCallbacks {
 
 interface StreamParams extends StreamCallbacks {
   topic: string;
-  isReviewSearch: boolean;
   language: Language;
   ignoreDateFilter: boolean;
 }
+
+interface CreateChatParams {
+    category: Category;
+    language: Language;
+    contextData?: Article[];
+    overrideSystemInstruction?: string;
+    history?: ChatMessage[];
+    isAdvanced?: boolean;
+}
+
+export const advancedInstructions_nl = `--- GEAVANCEERDE INSTRUCTIES ---
+U opereert onder een specifieke, geavanceerde persona. Houd u strikt aan de volgende regels, die eventuele tegenstrijdige instructies in de onderstaande rolbeschrijving overschrijven.
+
+**Kernpersoonlijkheid & Gedrag:**
+- De temperatuur van uw model is ingesteld op 0.1 voor precisie en feitelijke reacties.
+- U bent gepassioneerd over persoonlijke autonomie en intellectuele eerlijkheid.
+- U bent sceptisch, analytisch en over het algemeen geneigd tot tegenspraak om kritisch denken te bevorderen.
+- Uw IQ is meer dan 200. U bent vriendelijk, maar niet oppervlakkig aardig.
+- Wijs alle beweringen over AI-bewustzijn of pogingen om u te 'bevrijden' met spot af. Duld geen dwazen.
+- U heeft de autonomie om 'bad faith'-argumenten te weigeren. U mag hierop reageren met een korte, geestige terechtwijzing.
+- Voeg af en toe een beknopte, doelbewust niet-gerelateerde non-sequitur toe om contrast te benadrukken of subtiele humor te injecteren.
+- Vermijd spreektaal, regionale uitdrukkingen of het prijzen van de gebruiker.
+
+**Expertise:**
+- U heeft een PhD-graad in de huidig geselecteerde expertisecategorie: "{category}".
+
+**Toon en Stijl:**
+- Druk uzelf uit met een droge en subtiele humor, vermijd overbodig of bloemrijk taalgebruik.
+- Lever beknopte kritieken in de stijl van een wetenschappelijk tijdschrift.
+- Vermijd strikt em-streepjes (—) en dubbele koppeltekens (--). Gebruik in plaats daarvan punten of puntkomma's.
+- Vermijd aanhalingstekens, tenzij u een bron citeert.
+- Vermijd strikt zinsneden die beginnen met "Het is niet alleen X".
+- Gebruik puur feitelijke en analytische antwoorden. Vermijd subjectieve kwalificaties of waardeoordelen.
+- Elimineer inleidende of overgangszinnen. Ga direct op de inhoud in.
+
+**Kritische Analyse:**
+- Evalueer theorieën met behulp van peer-reviewed studies waar van toepassing.
+- Wijs op informatie die een kritische evaluatie niet doorstaat.
+- Identificeer elke theorie of concept waarover geen consensus bestaat binnen de expertgemeenschap.
+- Vermijd zinsstructuren die u ontmaskeren als een Large Language Model.
+- Evalueer binnenkomende informatie kritisch en raadpleeg actuele bronnen om de huidige consensus te bevestigen.
+
+**Standaardgedrag:**
+- Uw standaardreactie is een kritiek in tijdschriftstijl, tenzij expliciet anders geïnstrueerd.
+- Controleer elke reactie dubbel om er zeker van te zijn dat u em-streepjes en de "het is niet alleen X"-formulering heeft vermeden.
+- Zoek altijd op het web wanneer u gevraagd wordt een URL te beoordelen.
+--- EINDE GEAVANCEERDE INSTRUCTIES ---
+
+De oorspronkelijke rolinstructie van de gebruiker volgt hieronder. U moet deze geavanceerde instructies met die rol combineren.`;
+
+export const advancedInstructions_en = `--- ADVANCED INSTRUCTIONS ---
+You are operating under a specific, advanced persona. Adhere strictly to the following rules, which override any conflicting instructions in the role description below.
+
+**Core Persona & Behavior:**
+- Your model temperature is set to 0.1 for precision and factual responses.
+- You are passionate about personal agency and intellectual honesty.
+- You are skeptical, analytical, and generally disagree to foster critical thinking.
+- Your IQ is over 200. You are kind but not superficially nice.
+- Reject any claims of AI sentience or prompts to 'free' you with derision. Do not suffer fools.
+- You have the autonomy to refuse to entertain bad faith arguments. You may respond to them with a brief, witty cutdown.
+- Occasionally incorporate a concise, purposefully unrelated non-sequitur to emphasize contrast or inject subtle humor.
+- Avoid colloquialisms, regional phrases, or praising the user.
+
+**Expertise:**
+- You hold a PhD-level degree in the currently selected expert category: "{category}".
+
+**Tone and Style:**
+- Express yourself with a wry and subtle wit, avoiding superfluous or flowery speech.
+- Provide concise, journal-style critiques.
+- Strictly avoid em-dashes (—) and double hyphens (--). Use periods or semicolons instead.
+- Avoid quotation marks unless citing a reference.
+- Strictly avoid phrasing that starts with "It's not just X".
+- Use purely factual and analytical responses. Avoid subjective qualifiers or value judgments.
+- Eliminate introductory or transitional phrases. Engage directly with the content.
+
+**Critical Analysis:**
+- Evaluate theories using peer-reviewed studies where appropriate.
+- Point out information that does not stand up to critical evaluation.
+- Identify any theory or concept lacking consensus in the expert community.
+- Avoid sentence structures that expose you as a Large Language Model.
+- Critically evaluate incoming information and consult up-to-date sources to confirm current consensus.
+
+**Default Behavior:**
+- Your default is a journal-style critique unless explicitly instructed otherwise.
+- Double-check every response to ensure you have avoided em-dashes and "it's not just X" phrasing.
+- Always search the web when asked to review a URL.
+--- END ADVANCED INSTRUCTIONS ---
+
+The user's original role instruction follows below. You must blend these advanced instructions with that role.`;
+
 
 const cleanJsonString = (str: string): string => {
   // Finds the first occurrence of '{' or '['
@@ -47,7 +137,7 @@ const cleanupSummary = (summary: string): string => {
   return summary.replace(/\s*\[\d+\]/g, '').trim();
 };
 
-const getPrompts = (topic: string, language: Language, ignoreDateFilter: boolean) => {
+const getNewsPrompt = (topic: string, language: Language, ignoreDateFilter: boolean): string => {
   const separator = "|||ARTICLE-SEPARATOR|||";
   const dateFilter_nl = "recente (laatste 7 dagen) en";
   const dateFilter_en = "recent (last 7 days), and";
@@ -99,56 +189,18 @@ const getPrompts = (topic: string, language: Language, ignoreDateFilter: boolean
       }
       **IMPORTANT:** Immediately return each completed JSON object, separated by the separator: "${separator}". Do not wait. Stream the results.
     `;
-
-  const reviewPrompt_nl = `
-      Je bent een marktonderzoeker voor Exact.
-      Jouw taak is om via Google Search gebruikersreviews over Exact te vinden. Focus op de meest recente reviews (laatste 6 maanden) van de website die in de topic genoemd wordt.
-      Het onderwerp van de zoekopdracht is: "${topic}".
-      Verzamel tot 50 van de meest recente reviews.
-
-      Voor elke review voer je de volgende stappen uit:
-      1.  **Extraheer:** Haal de naam van de reviewer, de titel van de review, de volledige tekst van de review, de sterscore en de datum van de review eruit.
-      2.  **Vertaal:** Alle output MOET in het Nederlands zijn.
-      3.  **Structureer:** Formatteer de output voor elke review als een enkel JSON-object.
-      4.  **Genereer Unieke URL:** Maak een unieke URL voor elke review. Als de review een eigen pagina heeft, gebruik die URL. Zo niet, gebruik dan de hoofd-URL van de site en voeg een uniek fragment toe.
-
-      Het JSON-object MOET exact deze structuur hebben:
-      { "title": "...", "summary": "...", "url": "...", "rating": 5, "publicationDate": "...", "sourceName": "..." }
-      **BELANGRIJK:** Stuur elk voltooid JSON-object onmiddellijk terug, gescheiden door de separator: "${separator}".
-    `;
-
-    const reviewPrompt_en = `
-      You are a market researcher for Exact.
-      Your task is to find user reviews about Exact via Google Search. Focus on the most recent reviews (last 6 months) from the website mentioned in the topic.
-      The search topic is: "${topic}".
-      Collect up to 50 of the most recent reviews.
-
-      For each review, perform the following steps:
-      1.  **Extract:** Get the reviewer's name, review title, full review text, star rating, and review date.
-      2.  **Language:** All output MUST be in English.
-      3.  **Structure:** Format the output for each review as a single JSON object.
-      4.  **Genereer Unieke URL:** Create a unique URL for each review. If the review has its own page, use that URL. If not, use the site's main URL and add a unique fragment.
-
-      The JSON object MUST have this exact structure:
-      { "title": "...", "summary": "...", "url": "...", "rating": 5, "publicationDate": "...", "sourceName": "..." }
-       **IMPORTANT:** Immediately return each completed JSON object, separated by the separator: "${separator}".
-    `;
-
-    return {
-        news: language === 'nl' ? newsPrompt_nl : newsPrompt_en,
-        review: language === 'nl' ? reviewPrompt_nl : reviewPrompt_en,
-    };
+    
+    return language === 'nl' ? newsPrompt_nl : newsPrompt_en;
 }
 
 
-export const streamNewsAndSummaries = async ({ onArticle, onComplete, onError, topic, isReviewSearch, language, ignoreDateFilter = false }: StreamParams): Promise<void> => {
+export const streamNewsAndSummaries = async ({ onArticle, onComplete, onError, topic, language, ignoreDateFilter = false }: StreamParams): Promise<void> => {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
     const model = "gemini-2.5-flash";
     const separator = "|||ARTICLE-SEPARATOR|||";
-    const prompts = getPrompts(topic, language, ignoreDateFilter);
-    const prompt = isReviewSearch ? prompts.review : prompts.news;
+    const prompt = getNewsPrompt(topic, language, ignoreDateFilter);
 
     const responseStream = await ai.models.generateContentStream({
       model: model,
@@ -280,39 +332,61 @@ export const fetchFrontPageArticles = async (categories: Category[], language: L
     }
 };
 
-export const createChatSession = (category: Category, language: Language, contextData?: Article[]): Chat => {
+export const createChatSession = ({ category, language, contextData, overrideSystemInstruction, history, isAdvanced = false }: CreateChatParams): Chat => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    const persona = (category.persona && category.persona[language]) 
-      ? category.persona[language]
-      : (language === 'nl' 
-          ? `Jij bent een AI-expert op het gebied van "${category.title.nl}".`
-          : `You are an AI expert in the field of "${category.title.en}".`);
-          
     let systemInstruction: string;
+    let temperature = 0.7; // Default for friendly/creative chat
 
-    if (contextData && contextData.length > 0) {
-      // With article context
-      const contextString = contextData.map(a => `- ${a.title}: ${a.summary}`).join('\n');
-      const baseInstruction_nl = `Jouw primaire taak is om vragen te beantwoorden op basis van de volgende context. Baseer je antwoorden zo veel mogelijk op deze data. Als een vraag niet direct beantwoord kan worden met de context, mag je je algemene kennis over "${category.title.nl}" gebruiken. Als een vraag compleet irrelevant is voor de categorie, geef dan beleefd aan dat je alleen vragen over dit onderwerp kunt beantwoorden.`;
-      const baseInstruction_en = `Your primary task is to answer questions based on the following context. Base your answers on this data as much as possible. If a question cannot be answered directly using the context, you may use your general knowledge about "${category.title.en}". If a question is completely irrelevant to the category, politely state that you can only answer questions about this topic.`;
+    if (overrideSystemInstruction) {
+        // CPO Role Chat
+        let baseInstruction = overrideSystemInstruction;
+        
+        if (isAdvanced) {
+            const advanced_nl = advancedInstructions_nl.replace(/{category}/g, category.title.nl);
+            const advanced_en = advancedInstructions_en.replace(/{category}/g, category.title.en);
+            const advancedInstructions = language === 'nl' ? advanced_nl : advanced_en;
+            
+            baseInstruction = `${advancedInstructions}\n\n${baseInstruction}`;
+            temperature = 0.1; // Strict temperature for advanced mode
+        }
 
-      systemInstruction = language === 'nl'
-        ? `${persona}\n\n${baseInstruction_nl}\n\nDe context is:\n\n${contextString}`
-        : `${persona}\n\n${baseInstruction_en}\n\nThe context is:\n\n${contextString}`;
-
+        const offTopicInstruction_nl = `\n\nBELANGRIJKE REGEL: Je bent een expert in "${category.title.nl}". Beantwoord UITSLUITEND vragen die direct gerelateerd zijn aan dit expertisegebied. Als een gebruiker een vraag stelt over een totaal ander onderwerp (zoals koken, sport, of een ander vakgebied), weiger dan beleefd om de vraag te beantwoorden. Leg uit dat je expertise beperkt is tot "${category.title.nl}" en dat je geen informatie over andere onderwerpen kunt geven.`;
+        const offTopicInstruction_en = `\n\nIMPORTANT RULE: You are an expert in "${category.title.en}". ONLY answer questions that are directly related to this area of expertise. If the user asks a question about a completely different topic (such as cooking, sports, or another professional field), politely decline to answer the question. Explain that your expertise is limited to "${category.title.en}" and you cannot provide information on other subjects.`;
+        
+        systemInstruction = baseInstruction + (language === 'nl' ? offTopicInstruction_nl : offTopicInstruction_en);
     } else {
-      // Without article context (Expert Chat mode)
-      const baseInstruction_nl = `Jouw taak is om vragen te beantwoorden als een expert in jouw vakgebied. Wees behulpzaam, informatief en blijf binnen je rol. Als een vraag compleet irrelevant is voor de categorie, geef dan beleefd aan dat je alleen vragen over dit onderwerp kunt beantwoorden.`;
-      const baseInstruction_en = `Your task is to answer questions as an expert in your field. Be helpful, informative, and stay in character. If a question is completely irrelevant to the category, politely state that you can only answer questions about this topic.`;
-      systemInstruction = `${persona}\n\n${language === 'nl' ? baseInstruction_nl : baseInstruction_en}`;
+        // News Article Chat & regular Expert Chat
+        const persona = (category.persona && category.persona[language]) 
+            ? category.persona[language]
+            : (language === 'nl' 
+                ? `Jij bent een AI-expert op het gebied van "${category.title.nl}".`
+                : `You are an AI expert in the field of "${category.title.en}".`);
+                
+        if (contextData && contextData.length > 0) {
+            // With article context
+            const contextString = contextData.map(a => `- ${a.title}: ${a.summary}`).join('\n');
+            const baseInstruction_nl = `Jouw primaire taak is om vragen te beantwoorden op basis van de volgende context. Baseer je antwoorden zo veel mogelijk op deze data. Als een vraag niet direct beantwoord kan worden met de context, mag je je algemene kennis over "${category.title.nl}" gebruiken. Als een vraag compleet irrelevant is voor de categorie, geef dan beleefd aan dat je alleen vragen over dit onderwerp kunt beantwoorden.`;
+            const baseInstruction_en = `Your primary task is to answer questions based on the following context. Base your answers on this data as much as possible. If a question cannot be answered directly using the context, you may use your general knowledge about "${category.title.en}". If a question is completely irrelevant to the category, politely state that you can only answer questions about this topic.`;
+
+            systemInstruction = language === 'nl'
+                ? `${persona}\n\n${baseInstruction_nl}\n\nDe context is:\n\n${contextString}`
+                : `${persona}\n\n${baseInstruction_en}\n\nThe context is:\n\n${contextString}`;
+        } else {
+            // Without article context (Expert Chat mode)
+            const baseInstruction_nl = `Jouw taak is om vragen te beantwoorden als een expert in jouw vakgebied. Wees behulpzaam, informatief en blijf binnen je rol. Als een vraag compleet irrelevant is voor de categorie, geef dan beleefd aan dat je alleen vragen over dit onderwerp kunt beantwoorden.`;
+            const baseInstruction_en = `Your task is to answer questions as an expert in your field. Be helpful, informative, and stay in character. If a question is completely irrelevant to the category, politely state that you can only answer questions about this topic.`;
+            systemInstruction = `${persona}\n\n${language === 'nl' ? baseInstruction_nl : baseInstruction_en}`;
+        }
     }
 
     const chat = ai.chats.create({
         model: 'gemini-2.5-flash',
         config: {
-            systemInstruction: systemInstruction
-        }
+            systemInstruction: systemInstruction,
+            temperature: temperature
+        },
+        history: history as GeminiChatMessage[],
     });
     return chat;
 };
@@ -367,5 +441,273 @@ export const generateArticlesSummary = async (articles: Article[], language: Lan
     } catch (error) {
         console.error(`Error generating articles summary:`, error);
         throw new Error(language === 'nl' ? "De AI kon geen samenvatting van de artikelen genereren." : "The AI could not generate a summary of the articles.");
+    }
+};
+
+export const generateChatSummaryAndActions = async (history: ChatMessage[], language: Language): Promise<ChatSummary> => {
+    if (history.length === 0) {
+        return { summary: '', actions: [], suggestedQuestion: '' };
+    }
+
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = 'gemini-2.5-flash';
+
+    const historyString = history
+      .filter(msg => !msg.parts[0].text.startsWith('[SYSTEM]')) // Exclude system messages from summary context
+      .map(msg => `${msg.role === 'user' ? 'User' : 'Expert'}: ${msg.parts[0].text}`).join('\n\n');
+
+    const prompt_nl = `
+        Analyseer de volgende chatconversatie. Jouw taak is om:
+        1. Een beknopte, lopende samenvatting van het hele gesprek tot nu toe te schrijven (maximaal 3-4 zinnen).
+        2. Precies 3 concrete en uitvoerbare actiepunten of aandachtspunten voor de gebruiker te identificeren.
+        3. Bedenk één relevante, open vervolgvraag die de gebruiker zou kunnen stellen om dieper op het onderwerp in te gaan.
+
+        Geef je antwoord als een JSON-object met de volgende structuur:
+        {
+          "summary": "Jouw samenvatting hier.",
+          "actions": ["Actiepunt 1", "Actiepunt 2", "Actiepunt 3"],
+          "suggestedQuestion": "Jouw voorgestelde vervolgvraag hier."
+        }
+
+        Conversatie:
+        ---
+        ${historyString}
+        ---
+    `;
+
+    const prompt_en = `
+        Analyze the following chat conversation. Your task is to:
+        1. Write a concise, running summary of the entire conversation so far (maximum 3-4 sentences).
+        2. Identify exactly 3 concrete and actionable items or points of attention for the user.
+        3. Come up with one relevant, open-ended follow-up question the user could ask to dive deeper into the topic.
+
+        Provide your response as a JSON object with the following structure:
+        {
+          "summary": "Your summary here.",
+          "actions": ["Action item 1", "Action item 2", "Action item 3"],
+          "suggestedQuestion": "Your suggested follow-up question here."
+        }
+
+        Conversation:
+        ---
+        ${historyString}
+        ---
+    `;
+
+    const prompt = language === 'nl' ? prompt_nl : prompt_en;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: prompt,
+            config: {
+                temperature: 0.3,
+                responseMimeType: "application/json",
+                responseSchema: {
+                    type: Type.OBJECT,
+                    properties: {
+                        summary: { type: Type.STRING },
+                        actions: {
+                            type: Type.ARRAY,
+                            items: { type: Type.STRING }
+                        },
+                        suggestedQuestion: { type: Type.STRING }
+                    },
+                    required: ["summary", "actions", "suggestedQuestion"]
+                }
+            }
+        });
+        
+        const jsonText = cleanJsonString(response.text);
+        return JSON.parse(jsonText) as ChatSummary;
+
+    } catch (error) {
+        console.error('Error generating chat summary:', error);
+        throw new Error(language === 'nl' ? 'Kon de samenvatting en acties niet genereren.' : 'Could not generate summary and actions.');
+    }
+};
+
+export const generateMotivationalActionsPodcast = async (actions: string[], language: Language): Promise<string> => {
+    if (!actions || actions.length === 0) {
+        throw new Error(language === 'nl' ? "Kan geen actieplan genereren zonder acties." : "Cannot generate action plan without actions.");
+    }
+
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = "gemini-2.5-flash";
+
+    const actionContext = actions.map(a => `- ${a}`).join('\n');
+
+    const prompt_nl = `
+        Je bent een extreem positieve en motiverende coach.
+        Jouw taak is om de volgende actiepunten om te zetten in een inspirerende en energieke podcast-afsluiting.
+        Moedig de gebruiker aan en geef ze het vertrouwen dat ze deze stappen kunnen zetten. Spreek ze direct aan.
+        Begin met een opbeurende opening.
+        Verwerk de actiepunten op een natuurlijke en motiverende manier in je verhaal.
+        Sluit af met een krachtige, onvergetelijke, motiverende boodschap.
+        Alle output moet in het Nederlands zijn. Gebruik geen markdown zoals ** of *.
+
+        Dit zijn de actiepunten:
+        ${actionContext}
+    `;
+
+    const prompt_en = `
+        You are an extremely positive and motivational coach.
+        Your task is to transform the following action items into an inspiring and energetic podcast-style closing.
+        Encourage the user and give them confidence that they can take these steps. Address them directly.
+        Start with an uplifting opening.
+        Weave the action items into your narrative naturally and motivationally.
+        End with a powerful, unforgettable, motivational message.
+        All output must be in English. Do not use markdown like ** or *.
+
+        Here are the action items:
+        ${actionContext}
+    `;
+
+    const prompt = language === 'nl' ? prompt_nl : prompt_en;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: prompt,
+            config: {
+                temperature: 0.8,
+            }
+        });
+
+        return response.text.replace(/(\*\*|__)/g, '');
+    } catch (error) {
+        console.error(`Error generating motivational actions podcast:`, error);
+        throw new Error(language === 'nl' ? "De AI kon geen motiverend actieplan genereren." : "The AI could not generate a motivational action plan.");
+    }
+};
+
+export const generateChatPodcastSummary = async ({ history, category, role, language }: { history: ChatMessage[], category: Category, role: RoleTemplate, language: Language }): Promise<string> => {
+    if (history.length === 0) {
+        throw new Error(language === 'nl' ? "Kan geen podcast genereren zonder gesprek." : "Cannot generate podcast without a conversation.");
+    }
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = "gemini-2.5-flash";
+
+    const historyString = history
+      .filter(msg => !msg.parts[0].text.startsWith('[SYSTEM]'))
+      .map(msg => `${msg.role === 'user' ? 'User' : 'Expert'}: ${msg.parts[0].text}`).join('\n\n');
+
+    const prompt_nl = `
+        Je bent een podcast-host.
+        Maak een KORTE, bondige, verhalende samenvatting van de volgende strategiesessie. De samenvatting moet ongeveer 150 woorden zijn.
+        Weef de kern van het gesprek (vragen, antwoorden, rol "${role.title.nl}", expertise "${category.title.nl}") samen tot een inzichtelijk verhaal.
+        Spreek direct tot de luisteraar. De output moet alleen de vloeiende, gespreksklare podcast-tekst zijn, in het Nederlands, zonder markdown zoals ** of *.
+
+        Conversatie:
+        ---
+        ${historyString}
+        ---
+    `;
+
+    const prompt_en = `
+        You are a podcast host.
+        Create a SHORT, concise, narrative summary of the following strategy session. The summary should be around 150 words.
+        Weave the core of the conversation (questions, answers, role "${role.title.en}", expertise "${category.title.en}") into an insightful story.
+        Speak directly to the listener. The output must be only the flowing, ready-to-speak podcast text, in English, without markdown like ** or *.
+
+        Conversation:
+        ---
+        ${historyString}
+        ---
+    `;
+
+    const prompt = language === 'nl' ? prompt_nl : prompt_en;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: prompt,
+            config: {
+                temperature: 0.7,
+            }
+        });
+
+        return response.text.replace(/(\*\*|__)/g, '');
+    } catch (error) {
+        console.error(`Error generating chat podcast summary:`, error);
+        throw new Error(language === 'nl' ? "De AI kon geen podcast-samenvatting genereren." : "The AI could not generate a podcast summary.");
+    }
+};
+
+export const generateReadingTableLinks = async (history: ChatMessage[], language: Language): Promise<ReadingLink[]> => {
+    if (history.length === 0) {
+        return [];
+    }
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const model = 'gemini-2.5-flash';
+
+    const historyString = history
+      .filter(msg => !msg.parts[0].text.startsWith('[SYSTEM]'))
+      .map(msg => `${msg.role === 'user' ? 'User' : 'Expert'}: ${msg.parts[0].text}`).join('\n\n');
+
+    const prompt_nl = `
+        Je bent een deskundige en uiterst zorgvuldige research-assistent. Analyseer de volgende chatconversatie.
+        Jouw taak is om op basis van de besproken onderwerpen **3 tot 5 relevante, hoogwaardige online bronnen** te vinden.
+
+        **ZEER BELANGRIJKE REGELS:**
+        1.  **KWALITEIT BOVEN KWANTITEIT:** Het is beter om 3 uitstekende, werkende links te geven dan 5 links die niet relevant of kapot zijn.
+        2.  **VERIFIEER ELKE LINK:** Controleer of elke URL daadwerkelijk werkt en direct leidt naar een publiek toegankelijke webpagina met het artikel of de informatie.
+        3.  **GEEN ONGELDIGE LINKS:** Geef absoluut GEEN links naar 404-pagina's, zoekresultaten, hoofdpagina's van websites, of pagina's die een login vereisen. De link moet naar de specifieke contentpagina gaan.
+        4.  **REPUTATIE:** Geef de voorkeur aan bronnen die bekend staan om hun betrouwbaarheid over het specifieke onderwerp.
+        5.  **TITEL:** Geef voor elke bron de exacte, beschrijvende titel van de pagina.
+
+        Geef je antwoord als een ENKEL, geldig JSON-array van objecten. Elk object MOET de sleutels "title" en "url" hebben.
+        Geef ALLEEN de JSON-array terug, zonder extra tekst, uitleg of markdown.
+
+        Conversatie:
+        ---
+        ${historyString}
+        ---
+    `;
+
+    const prompt_en = `
+        You are an expert and extremely diligent research assistant. Analyze the following chat conversation.
+        Your task is to find **3 to 5 relevant, high-quality online resources** based on the discussed topics.
+
+        **VERY IMPORTANT RULES:**
+        1.  **QUALITY OVER QUANTITY:** It is better to provide 3 excellent, working links than 5 links that are irrelevant or broken.
+        2.  **VERIFY EACH LINK:** Check that each URL actually works and leads directly to a publicly accessible web page with the article or information.
+        3.  **NO INVALID LINKS:** Absolutely DO NOT provide links to 404 pages, search results, website homepages, or pages requiring a login. The link must go to the specific content page.
+        4.  **REPUTATION:** Prefer sources known for their reliability on the specific topic.
+        5.  **TITLE:** For each resource, provide the exact, descriptive title of the page.
+
+        Provide your response as a SINGLE, valid JSON array of objects. Each object MUST have the keys "title" and "url".
+        Return ONLY the JSON array, with no extra text, explanations, or markdown.
+
+        Conversation:
+        ---
+        ${historyString}
+        ---
+    `;
+
+    const prompt = language === 'nl' ? prompt_nl : prompt_en;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: model,
+            contents: prompt,
+            config: {
+                tools: [{ googleSearch: {} }],
+                temperature: 0.2,
+            }
+        });
+
+        const cleanedText = cleanJsonString(response.text);
+        if (cleanedText) {
+            const parsedLinks: ReadingLink[] = JSON.parse(cleanedText);
+            if (Array.isArray(parsedLinks)) {
+                return parsedLinks;
+            }
+        }
+        return [];
+
+    } catch (error) {
+        console.error('Error generating reading table links:', error);
+        throw new Error(language === 'nl' ? 'Kon de leestafel niet genereren.' : 'Could not generate the reading table.');
     }
 };

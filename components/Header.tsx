@@ -9,46 +9,58 @@ interface HeaderProps {
   isNewspaperView?: boolean;
   isExpertChatView?: boolean;
   isInfoView?: boolean;
+  isCpoSetupView?: boolean;
+  isCpoChatView?: boolean;
   language: Language;
   theme: string;
   toggleTheme: () => void;
   toggleLanguage: () => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ onGoHome, selectedCategory, isNewspaperView, isExpertChatView, isInfoView, language, theme, toggleTheme, toggleLanguage }) => {
+const Header: React.FC<HeaderProps> = ({ 
+    onGoHome, 
+    selectedCategory, 
+    isNewspaperView, 
+    isExpertChatView, 
+    isInfoView,
+    isCpoSetupView,
+    isCpoChatView, 
+    language, 
+    theme, 
+    toggleTheme, 
+    toggleLanguage 
+}) => {
   const t = {
     nl: {
       mainTitle: "Exact's Daily",
-      newspaperTitle: "Exact's Daily",
-      defaultSubtitle: "Kies een categorie om het laatste nieuws te ontdekken, maak een interactieve krant of chat met een echte expert.",
-      newspaperSubtitle: "Uw gepersonaliseerde voorpagina, gegenereerd met AI, mogelijk gemaakt door E.D.",
-      reviewSubtitle: "Analyse van de meest recente gebruikersreviews, mogelijk gemaakt door E.D.",
-      categorySubtitle: (title: string) => `Uw dagelijkse briefing over de nieuwste ontwikkelingen in ${title.toLowerCase()}, mogelijk gemaakt door E.D.`
+      newspaperSubtitle: "Uw gepersonaliseerde voorpagina, gegenereerd met AI.",
+      categorySubtitle: (title: string) => `Uw briefing over de nieuwste ontwikkelingen in ${title.toLowerCase()}.`,
+      cpoSetupSubtitle: "Stel uw AI-expert samen voor een strategiesessie.",
+      cpoChatSubtitle: (title: string) => `Strategiesessie over ${title.toLowerCase()}.`
     },
     en: {
       mainTitle: "Exact's Daily",
-      newspaperTitle: "Exact's Daily",
-      defaultSubtitle: "Choose a category to discover the latest news, create an interactive newspaper, or chat with a real expert.",
-      newspaperSubtitle: "Your personalized front page, generated with AI, powered by E.D.",
-      reviewSubtitle: "Analysis of the most recent user reviews, powered by E.D.",
-      categorySubtitle: (title: string) => `Your daily briefing on the latest developments in ${title.toLowerCase()}, powered by E.D.`
+      newspaperSubtitle: "Your personalized front page, generated with AI.",
+      categorySubtitle: (title: string) => `Your briefing on the latest developments in ${title.toLowerCase()}.`,
+      cpoSetupSubtitle: "Configure your AI expert for a strategy session.",
+      cpoChatSubtitle: (title: string) => `Strategy session on ${title.toLowerCase()}.`
     }
   }
 
   const title = t[language].mainTitle;
   
-  let subtitle: string;
+  let subtitle: string | null = null;
   if (isNewspaperView) {
     subtitle = t[language].newspaperSubtitle;
+  } else if (isCpoSetupView) {
+    subtitle = t[language].cpoSetupSubtitle;
+  } else if (isCpoChatView && selectedCategory) {
+    subtitle = t[language].cpoChatSubtitle(selectedCategory.title[language]);
   } else if (selectedCategory) {
-    if (selectedCategory.isReviewCategory) {
-      subtitle = t[language].reviewSubtitle;
-    } else {
-      subtitle = t[language].categorySubtitle(selectedCategory.title[language]);
-    }
-  } else {
-    subtitle = t[language].defaultSubtitle;
+    subtitle = t[language].categorySubtitle(selectedCategory.title[language]);
   }
+
+  const hideSubtitle = isExpertChatView || isInfoView;
 
   return (
     <header className="text-center mb-8">
@@ -62,13 +74,19 @@ const Header: React.FC<HeaderProps> = ({ onGoHome, selectedCategory, isNewspaper
         </div>
         <div className="flex items-center space-x-3">
           <LanguageSwitcher language={language} toggleLanguage={toggleLanguage} />
-          <ThemeSwitcher theme={theme} toggleTheme={toggleTheme} language={language} />
+          <ThemeSwitcher theme={theme} toggleTheme={toggleLanguage} language={language} />
         </div>
       </div>
-      {!isExpertChatView && !isInfoView && (
-       <p className="mt-4 max-w-2xl mx-auto text-lg text-slate-600 dark:text-slate-400 text-left">
-        {subtitle}
-      </p>
+       {!hideSubtitle && subtitle && (
+        (isCpoSetupView || isCpoChatView) ? (
+          <h2 className="mt-6 text-left text-2xl font-bold text-slate-800 dark:text-slate-200">
+            {subtitle}
+          </h2>
+        ) : (
+          <p className="mt-4 max-w-2xl text-lg text-slate-600 dark:text-slate-400 text-left">
+            {subtitle}
+          </p>
+        )
       )}
     </header>
   );

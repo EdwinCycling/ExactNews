@@ -1,4 +1,5 @@
 
+
 import React, { useState } from 'react';
 import { Language } from '../types';
 
@@ -14,7 +15,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, language }) => {
 
   const t = {
     nl: {
-      title: "Welkom bij Exact's AI Nieuws Digest",
+      title: "Welkom bij Exact's AI Daily",
       subtitle: "Voer de 4-cijferige toegangscode in.",
       button: "Ontgrendel",
       error: "Ongeldige code. Probeer het opnieuw.",
@@ -23,7 +24,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, language }) => {
       delete: "Wissen",
     },
     en: {
-      title: "Welcome to Exact's AI News Digest",
+      title: "Welcome to Exact's AI Daily",
       subtitle: "Please enter the 4-digit access code.",
       button: "Unlock",
       error: "Invalid code. Please try again.",
