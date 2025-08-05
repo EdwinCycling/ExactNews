@@ -1,3 +1,5 @@
+
+
 import React from 'react';
 import { Language } from '../types';
 
@@ -9,7 +11,8 @@ interface InfoCardProps {
 const InfoCard: React.FC<InfoCardProps> = ({ onShowInfo, language }) => {
   const t = {
     nl: { title: "Info", tooltip: "Bekijk de functies van deze app" },
-    en: { title: "Info", tooltip: "View the features of this app" }
+    en: { title: "Info", tooltip: "View the features of this app" },
+    de: { title: "Info", tooltip: "Funktionen dieser App anzeigen" },
   };
 
   return (

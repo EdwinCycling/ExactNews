@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Language } from '../types';
 
@@ -15,45 +16,46 @@ interface Feature {
 const features: Feature[] = [
   {
     icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" /></svg>,
-    title: { nl: "AI Nieuws Analyse", en: "AI News Analysis" },
-    description: { nl: "Krijg het laatste nieuws over een onderwerp, samengevat en beoordeeld door AI. Stel vervolgens verdiepende vragen over de gevonden artikelen in de geïntegreerde chat.", en: "Get the latest news on any topic, summarized and rated by AI. You can then ask in-depth questions about the found articles in the integrated chat." }
+    title: { nl: "AI Nieuws Analyse", en: "AI News Analysis", de: "KI-Nachrichtenanalyse" },
+    description: { nl: "Krijg het laatste nieuws over een onderwerp, samengevat en beoordeeld door AI. Stel vervolgens verdiepende vragen over de gevonden artikelen in de geïntegreerde chat.", en: "Get the latest news on any topic, summarized and rated by AI. You can then ask in-depth questions about the found articles in the integrated chat.", de: "Erhalten Sie die neuesten Nachrichten zu jedem Thema, zusammengefasst und bewertet von der KI. Sie können dann im integrierten Chat vertiefende Fragen zu den gefundenen Artikeln stellen." }
   },
   {
     icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.455.09-.934.09-1.425v-2.134c0-2.616.21-5.135 1.693-7.182a10.745 10.745 0 0 1 1.644-2.059c.754-1.168 2.16-1.884 3.86-1.884 3.313 0 6 2.687 6 6Z" /></svg>,
-    title: { nl: "Vraag de Expert", en: "Ask the Expert" },
-    description: { nl: "Stel directe vragen aan een AI-expert met een specifieke persona, getraind om u diepgaande antwoorden te geven binnen een vakgebied.", en: "Ask direct questions to an AI expert with a specific persona, trained to give you in-depth answers within a professional domain." }
+    title: { nl: "Vraag de Expert", en: "Ask the Expert", de: "Fragen Sie den Experten" },
+    description: { nl: "Stel directe vragen aan een AI-expert met een specifieke persona, getraind om u diepgaande antwoorden te geven binnen een vakgebied.", en: "Ask direct questions to an AI expert with a specific persona, trained to give you in-depth answers within a professional domain.", de: "Stellen Sie direkte Fragen an einen KI-Experten mit einer spezifischen Persona, der darauf trainiert ist, Ihnen tiefgehende Antworten in einem Fachgebiet zu geben." }
   },
   {
     icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>,
-    title: { nl: "Interactieve Krant", en: "Interactive Newspaper" },
-    description: { nl: "Genereer een unieke voorpagina, 'Exact's Daily', met het belangrijkste nieuws uit uw favoriete categorieën.", en: "Generate a unique front page, 'Exact's Daily', featuring the top news from your favorite categories." }
+    title: { nl: "Interactieve Krant", en: "Interactive Newspaper", de: "Interaktive Zeitung" },
+    description: { nl: "Genereer een unieke voorpagina, 'Exact's Daily', met het belangrijkste nieuws uit uw favoriete categorieën.", en: "Generate a unique front page, 'Exact's Daily', featuring the top news from your favorite categories.", de: "Erstellen Sie eine einzigartige Titelseite, 'Exact's Daily', mit den Top-Nachrichten aus Ihren Lieblingskategorien." }
   },
   {
     icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M12 18.75a6 6 0 0 0 6-6v-1.5m-6 7.5a6 6 0 0 1-6-6v-1.5m6 7.5v3.75m-3.75 0h7.5M12 15.75a3 3 0 0 1-3-3V4.5a3 3 0 0 1 6 0v8.25a3 3 0 0 1-3 3Z" /></svg>,
-    title: { nl: "Podcast Functie", en: "Podcast Feature" },
-    description: { nl: "Luister naar de volledige nieuwsartikelen of een door AI gegenereerde samenvatting van al het nieuws.", en: "Listen to the full news articles or an AI-generated summary of all the news." }
+    title: { nl: "Podcast Functie", en: "Podcast Feature", de: "Podcast-Funktion" },
+    description: { nl: "Luister naar de volledige nieuwsartikelen of een door AI gegenereerde samenvatting van al het nieuws.", en: "Listen to the full news articles or an AI-generated summary of all the news.", de: "Hören Sie sich die vollständigen Nachrichtenartikel oder eine von der KI generierte Zusammenfassung aller Nachrichten an." }
   },
   {
     icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.321l5.522.802a.563.563 0 0 1 .314.968l-4.001 3.882a.563.563 0 0 0-.162.531l.946 5.397a.563.563 0 0 1-.815.592l-4.924-2.582a.562.562 0 0 0-.517 0l-4.924 2.582a.563.563 0 0 1-.815-.592l.946-5.397a.563.563 0 0 0-.162.531l-4.001-3.882a.563.563 0 0 1 .314-.968l5.522-.802a.563.563 0 0 0 .475-.321L11.48 3.5Z" /></svg>,
-    title: { nl: "Personalisatie", en: "Personalization" },
-    description: { nl: "Stel favoriete categorieën in, wissel tussen donkere/lichte modus en kies uw taal. Uw voorkeuren worden onthouden.", en: "Set favorite categories, switch between dark/light mode, and choose your language. Your preferences are saved." }
+    title: { nl: "Personalisatie", en: "Personalization", de: "Personalisierung" },
+    description: { nl: "Stel favoriete categorieën in, wissel tussen donkere/lichte modus en kies uw taal. Uw voorkeuren worden onthouden.", en: "Set favorite categories, switch between dark/light mode, and choose your language. Your preferences are saved.", de: "Legen Sie Lieblingskategorien fest, wechseln Sie zwischen Dunkel-/Hellmodus und wählen Sie Ihre Sprache. Ihre Einstellungen werden gespeichert." }
   },
   {
     icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M8 7h12m0 0-4-4m4 4-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>,
-    title: { nl: "Dynamische Rolwissel", en: "Dynamic Role Switching" },
-    description: { nl: "Wissel tijdens een CPO-strategiesessie naadloos van AI-expert. Krijg verschillende perspectieven op uw vraagstuk zonder de context van het gesprek te verliezen.", en: "Seamlessly switch AI experts during a CPO strategy session. Get different perspectives on your issue without losing the context of the conversation." }
+    title: { nl: "Dynamische Rolwissel", en: "Dynamic Role Switching", de: "Dynamischer Rollenwechsel" },
+    description: { nl: "Wissel tijdens een CPO-strategiesessie naadloos van AI-expert. Krijg verschillende perspectieven op uw vraagstuk zonder de context van het gesprek te verliezen.", en: "Seamlessly switch AI experts during a CPO strategy session. Get different perspectives on your issue without losing the context of the conversation.", de: "Wechseln Sie während einer CPO-Strategiesitzung nahtlos zwischen KI-Experten. Erhalten Sie unterschiedliche Perspektiven auf Ihr Problem, ohne den Kontext des Gesprächs zu verlieren." }
   },
   {
     icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-8 h-8"><path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" /></svg>,
-    title: { nl: "Beveiligde Toegang", en: "Secure Access" },
-    description: { nl: "Toegang tot de applicatie is beveiligd met een pincode om ongewenst gebruik te voorkomen.", en: "Access to the application is protected by a PIN code to prevent unauthorized usage." }
+    title: { nl: "Beveiligde Toegang", en: "Secure Access", de: "Sicherer Zugang" },
+    description: { nl: "Toegang tot de applicatie is beveiligd met een pincode om ongewenst gebruik te voorkomen.", en: "Access to the application is protected by a PIN code to prevent unauthorized usage.", de: "Der Zugriff auf die Anwendung ist durch einen PIN-Code geschützt, um eine unbefugte Nutzung zu verhindern." }
   }
 ];
 
 const InfoView: React.FC<InfoViewProps> = ({ onGoBack, language }) => {
   const t = {
     nl: { title: "Wat kan deze app?", back: "Terug naar overzicht" },
-    en: { title: "What can this app do?", back: "Back to overview" }
+    en: { title: "What can this app do?", back: "Back to overview" },
+    de: { title: "Was kann diese App?", back: "Zurück zur Übersicht" },
   };
   return (
     <div>

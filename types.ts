@@ -9,7 +9,7 @@ export interface Article {
   sourceName: string;
 }
 
-export type Language = 'en' | 'nl';
+export type Language = 'en' | 'nl' | 'de';
 
 export interface Category {
   key: string;
@@ -25,9 +25,14 @@ export interface RoleTemplate {
   text: { [key in Language]: string };
 }
 
+export interface ActionItem {
+  text: string;
+  priority: 'High' | 'Medium' | 'Low';
+}
+
 export interface ChatSummary {
   summary: string;
-  actions: string[];
+  actions: ActionItem[];
   suggestedQuestion: string;
 }
 
@@ -44,5 +49,30 @@ export interface ChatMessage {
 
 export interface ReadingLink {
   title: string;
+  url: string;
+}
+
+export interface Book {
+  title: string;
+  author: string;
+  amazonSearchUrl: string;
+}
+
+export interface TedTalk {
+  title: string;
+  speaker: string;
+  publicationDate: string;
+  summary: string;
+  youtubeSearchUrl: string;
+}
+
+export interface TedTalkResponse {
+  talks: TedTalk[];
+  relatedSuggestions?: string[];
+}
+
+export interface LinkedInLearningCourse {
+  title: string;
+  description: string;
   url: string;
 }

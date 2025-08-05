@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Article, Language } from '../types';
 
@@ -27,6 +26,13 @@ const NewspaperView: React.FC<NewspaperViewProps> = ({ articles, onClose, langua
       print: "Print / Save as PDF",
       mail: "Mail Newspaper",
       back: "Back",
+    },
+    de: {
+      date: new Date().toLocaleDateString('de-DE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase(),
+      price: "€1,25",
+      print: "Drucken / Als PDF speichern",
+      mail: "Zeitung mailen",
+      back: "Zurück",
     }
   };
 

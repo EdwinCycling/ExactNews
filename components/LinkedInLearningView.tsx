@@ -1,60 +1,52 @@
 import React from 'react';
-import { ReadingLink, Language, ChatMessage } from '../types';
+import { LinkedInLearningCourse, Language, ChatMessage } from '../types';
 
-interface ReadingTableViewProps {
-  links: ReadingLink[];
+interface LinkedInLearningViewProps {
+  courses: LinkedInLearningCourse[];
   isLoading: boolean;
   onGenerate: () => void;
   chatHistory: ChatMessage[];
   language: Language;
-  userContext: string;
   disabled?: boolean;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
 }
 
-const ReadingTableView: React.FC<ReadingTableViewProps> = ({ links, isLoading, onGenerate, chatHistory, language, userContext, disabled = false, isCollapsed, onToggleCollapse }) => {
+const LinkedInLearningView: React.FC<LinkedInLearningViewProps> = ({ courses, isLoading, onGenerate, chatHistory, language, disabled = false, isCollapsed, onToggleCollapse }) => {
   const t = {
     nl: {
-      title: 'De Leestafel',
-      description: 'Vind aanvullende artikelen en bronnen op basis van uw gesprek.',
-      buttonText: 'Vind artikelen',
-      generating: 'Artikelen zoeken...',
-      source: 'Bron:',
+      title: 'LinkedIn Learning',
+      description: 'Vind professionele cursussen gerelateerd aan uw gesprek.',
+      buttonText: 'Vind Cursussen',
+      generating: 'Cursussen zoeken...',
+      viewCourse: 'Bekijk Cursus',
       refresh: 'Verversen',
     },
     en: {
-      title: 'The Reading Table',
-      description: 'Find supplementary articles and resources based on your conversation.',
-      buttonText: 'Find Articles',
-      generating: 'Finding articles...',
-      source: 'Source:',
+      title: 'LinkedIn Learning',
+      description: 'Find professional courses related to your conversation.',
+      buttonText: 'Find Courses',
+      generating: 'Finding courses...',
+      viewCourse: 'View Course',
       refresh: 'Refresh',
     },
     de: {
-      title: 'Der Lesetisch',
-      description: 'Finden Sie ergänzende Artikel und Ressourcen basierend auf Ihrem Gespräch.',
-      buttonText: 'Artikel finden',
-      generating: 'Artikel werden gesucht...',
-      source: 'Quelle:',
+      title: 'LinkedIn Learning',
+      description: 'Finden Sie professionelle Kurse zu Ihrem Gespräch.',
+      buttonText: 'Kurse finden',
+      generating: 'Kurse werden gesucht...',
+      viewCourse: 'Kurs ansehen',
       refresh: 'Aktualisieren',
     },
   };
 
-  const getHostname = (url: string) => {
-    try {
-      return new URL(url).hostname.replace('www.', '');
-    } catch (e) {
-      return url;
-    }
-  };
-
   const SkeletonLoader = () => (
     <div className="space-y-4 animate-pulse">
-        {[...Array(3)].map((_, i) => (
+        {[...Array(2)].map((_, i) => (
             <div key={i} className="p-3 bg-slate-200/50 dark:bg-gray-700/50 rounded-lg">
                 <div className="h-4 bg-slate-300 dark:bg-gray-600 rounded w-3/4 mb-2"></div>
-                <div className="h-3 bg-slate-300 dark:bg-gray-600 rounded w-1/3"></div>
+                <div className="h-3 bg-slate-300 dark:bg-gray-600 rounded w-full mb-1"></div>
+                <div className="h-3 bg-slate-300 dark:bg-gray-600 rounded w-5/6"></div>
             </div>
         ))}
     </div>
@@ -64,12 +56,12 @@ const ReadingTableView: React.FC<ReadingTableViewProps> = ({ links, isLoading, o
     <div className="border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm">
       <button onClick={onToggleCollapse} className="w-full p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center text-left">
         <div className="flex items-center gap-3">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-indigo-500" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 1 1 0-4.125 2.062 2.062 0 0 1 0 4.125zm1.77-11.433H3.566v11.433h3.541V-4z"></path>
             </svg>
             <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold text-slate-800 dark:text-slate-200">{t[language].title}</h2>
-                 {links.length > 0 && !isLoading && (
+                {courses.length > 0 && !isLoading && (
                   <button
                       onClick={(e) => { e.stopPropagation(); onGenerate(); }}
                       disabled={disabled || isLoading}
@@ -89,7 +81,7 @@ const ReadingTableView: React.FC<ReadingTableViewProps> = ({ links, isLoading, o
       {!isCollapsed && (
         <div className="p-6">
             <p className="text-xs text-slate-500 dark:text-slate-400 mb-4 -mt-2">{t[language].description}</p>
-            {links.length === 0 && !isLoading && (
+            {courses.length === 0 && !isLoading && (
                 <button
                     onClick={onGenerate}
                     disabled={chatHistory.length < 2 || isLoading || disabled}
@@ -102,25 +94,21 @@ const ReadingTableView: React.FC<ReadingTableViewProps> = ({ links, isLoading, o
                 </button>
             )}
             {isLoading && <SkeletonLoader />}
-            {links.length > 0 && !isLoading && (
+            {courses.length > 0 && !isLoading && (
                 <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
-                    {links.map((link, index) => (
-                        <a
-                            key={index}
-                            href={link.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block p-3 rounded-lg bg-slate-100 dark:bg-gray-700/70 hover:bg-slate-200 dark:hover:bg-gray-700 transition-colors group"
-                        >
-                            <p className="font-semibold text-sm text-slate-800 dark:text-slate-200 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{link.title}</p>
-                            <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 flex items-center gap-1.5">
-                                {t[language].source} 
-                                <span className="font-medium text-slate-600 dark:text-slate-300">{getHostname(link.url)}</span>
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                            </p>
-                        </a>
+                    {courses.map((course, index) => (
+                        <div key={index} className="p-3 rounded-lg bg-slate-100 dark:bg-gray-700/70">
+                            <p className="font-semibold text-sm text-slate-800 dark:text-slate-200">{course.title}</p>
+                            <p className="text-xs text-slate-600 dark:text-slate-400 mt-1">{course.description}</p>
+                            <a
+                                href={course.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-block mt-2 text-xs font-semibold text-indigo-600 dark:text-indigo-400 hover:underline"
+                            >
+                                {t[language].viewCourse} &rarr;
+                            </a>
+                        </div>
                     ))}
                 </div>
             )}
@@ -130,4 +118,4 @@ const ReadingTableView: React.FC<ReadingTableViewProps> = ({ links, isLoading, o
   );
 };
 
-export default ReadingTableView;
+export default LinkedInLearningView;

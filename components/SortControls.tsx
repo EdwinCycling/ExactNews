@@ -11,7 +11,8 @@ const SortControls: React.FC<SortControlsProps> = ({ activeSort, onSortChange, l
   
   const t = {
     nl: { sortBy: 'Sorteer op:', date: 'Datum', rating: 'Belang' },
-    en: { sortBy: 'Sort by:', date: 'Date', rating: 'Importance' }
+    en: { sortBy: 'Sort by:', date: 'Date', rating: 'Importance' },
+    de: { sortBy: 'Sortieren nach:', date: 'Datum', rating: 'Wichtigkeit' },
   }
 
   const sortOptions: { key: Exclude<SortOrder, null>; label: string }[] = [

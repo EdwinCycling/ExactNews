@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Language } from '../types';
 
@@ -21,6 +20,10 @@ const CookieConsentToast: React.FC<CookieConsentToastProps> = ({ isVisible, onAc
     en: {
       message: "This site uses cookies to remember your theme, language, and favorite preferences. We also use cookies for anonymous statistics.",
       accept: "Accept",
+    },
+    de: {
+      message: "Diese Seite verwendet Cookies, um Ihre Einstellungen für Thema, Sprache und Favoriten zu speichern. Wir verwenden auch Cookies für anonyme Statistiken.",
+      accept: "Akzeptieren",
     }
   };
 

@@ -1,5 +1,3 @@
-
-
 import React, { useState } from 'react';
 import { Language } from '../types';
 
@@ -31,6 +29,15 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, language }) => {
       unexpectedError: "An unexpected error occurred. Check the console.",
       loading: "Checking...",
       delete: "Delete",
+    },
+    de: {
+      title: "Willkommen bei Exact's AI Daily",
+      subtitle: "Bitte geben Sie den 4-stelligen Zugangscode ein.",
+      button: "Entsperren",
+      error: "Ungültiger Code. Bitte versuchen Sie es erneut.",
+      unexpectedError: "Ein unerwarteter Fehler ist aufgetreten. Überprüfen Sie die Konsole.",
+      loading: "Überprüfen...",
+      delete: "Löschen",
     }
   };
 
@@ -108,25 +115,24 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, language }) => {
               {digit}
             </button>
           ))}
-          <div/>
+          <div /> {/* Placeholder for alignment */}
           <button
-              type="button"
-              key={0}
-              onClick={() => handleDigitClick(0)}
-              disabled={isLoading}
-              className="w-20 h-20 rounded-full bg-slate-100 dark:bg-gray-700/50 text-2xl font-semibold text-slate-700 dark:text-slate-300 transition-all duration-200 hover:bg-slate-200 dark:hover:bg-gray-600 active:scale-90 disabled:opacity-50"
-            >
-              0
-            </button>
+            type="button"
+            onClick={() => handleDigitClick(0)}
+            disabled={isLoading}
+            className="w-20 h-20 rounded-full bg-slate-100 dark:bg-gray-700/50 text-2xl font-semibold text-slate-700 dark:text-slate-300 transition-all duration-200 hover:bg-slate-200 dark:hover:bg-gray-600 active:scale-90 disabled:opacity-50"
+          >
+            0
+          </button>
           <button
             type="button"
             onClick={handleDeleteClick}
-            disabled={isLoading || code.length === 0}
-            aria-label={t[language].delete}
+            disabled={isLoading}
             className="w-20 h-20 rounded-full bg-slate-100 dark:bg-gray-700/50 flex items-center justify-center text-slate-700 dark:text-slate-300 transition-all duration-200 hover:bg-slate-200 dark:hover:bg-gray-600 active:scale-90 disabled:opacity-50"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9.75 14.25 12m0 0 2.25 2.25M14.25 12l2.25-2.25M14.25 12 12 14.25m-2.58 4.92-6.374-6.375a1.125 1.125 0 0 1 0-1.59L9.42 4.83c.21-.21.47-.322.75-.322h9c.622 0 1.125.503 1.125 1.125v9a1.125 1.125 0 0 1-1.125 1.125h-9c-.28 0-.54-.112-.75-.322Z" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <title>{t[language].delete}</title>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2M3 12l6.414 6.414a2 2 0 002.828 0L21 12M3 12l6.414-6.414a2 2 0 012.828 0L21 12" />
             </svg>
           </button>
         </div>
@@ -134,24 +140,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, language }) => {
         <button
           type="submit"
           disabled={isLoading || code.length !== 4}
-          className="w-full py-4 text-lg font-bold text-white bg-teal-500 rounded-lg transition-all duration-200 hover:bg-teal-600 active:scale-95 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500 dark:focus:ring-offset-gray-800 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:cursor-not-allowed"
+          className="w-full py-4 text-lg font-bold text-white bg-teal-500 rounded-lg shadow-lg hover:bg-teal-600 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-white dark:focus:ring-offset-gray-800 focus:ring-teal-500 disabled:bg-gray-400 dark:disabled:bg-gray-600 disabled:opacity-70 disabled:cursor-not-allowed"
         >
           {isLoading ? t[language].loading : t[language].button}
         </button>
-
       </form>
-       <style>{`
-        .animate-shake {
-          animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
-          transform: translate3d(0, 0, 0);
-        }
-        @keyframes shake {
-          10%, 90% { transform: translate3d(-1px, 0, 0); }
-          20%, 80% { transform: translate3d(2px, 0, 0); }
-          30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-          40%, 60% { transform: translate3d(4px, 0, 0); }
-        }
-      `}</style>
     </div>
   );
 };

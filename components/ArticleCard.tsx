@@ -9,10 +9,21 @@ interface ArticleCardProps {
 }
 
 const formatDate = (isoDate: string, lang: Language): { formattedDate: string; daysAgo: string } => {
-  const locale = lang === 'nl' ? 'nl-NL' : 'en-US';
+  const localeMap: { [key in Language]: string } = {
+    en: 'en-US',
+    nl: 'nl-NL',
+    de: 'de-DE',
+  };
+  const locale = localeMap[lang] || 'en-US';
+  
+  const t = {
+    nl: { unknownDate: 'Onbekende datum', today: 'Vandaag' },
+    en: { unknownDate: 'Unknown date', today: 'Today' },
+    de: { unknownDate: 'Unbekanntes Datum', today: 'Heute' },
+  }
   
   if (!isoDate || isNaN(new Date(isoDate).getTime())) {
-    return { formattedDate: lang === 'nl' ? 'Onbekende datum' : 'Unknown date', daysAgo: '' };
+    return { formattedDate: t[lang].unknownDate, daysAgo: '' };
   }
   
   const date = new Date(isoDate);
@@ -29,7 +40,7 @@ const formatDate = (isoDate: string, lang: Language): { formattedDate: string; d
   const rtf = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
   let daysAgo = '';
   if (diffDays === 0) {
-    daysAgo = lang === 'nl' ? 'Vandaag' : 'Today';
+    daysAgo = t[lang].today;
   } else {
     daysAgo = rtf.format(-diffDays, 'day');
   }
@@ -39,6 +50,12 @@ const formatDate = (isoDate: string, lang: Language): { formattedDate: string; d
 
 const ArticleCard: React.FC<ArticleCardProps> = ({ article, language, isSpeaking = false }) => {
   const { formattedDate, daysAgo } = formatDate(article.publicationDate, language);
+  
+  const t_read = {
+      nl: 'Lees volledig artikel',
+      en: 'Read full article',
+      de: 'Ganzen Artikel lesen',
+  }
 
   const ArrowUpRightIcon = (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4 ml-1" aria-hidden="true">
@@ -78,7 +95,7 @@ const ArticleCard: React.FC<ArticleCardProps> = ({ article, language, isSpeaking
           rel="noopener noreferrer"
           className="inline-flex items-center text-sm font-semibold text-teal-600 hover:text-teal-500 dark:text-teal-400 dark:hover:text-teal-300 transition-colors duration-200"
         >
-          {language === 'nl' ? 'Lees volledig artikel' : 'Read full article'}
+          {t_read[language]}
           {ArrowUpRightIcon}
         </a>
       </div>

@@ -14,7 +14,7 @@ interface HeaderProps {
   language: Language;
   theme: string;
   toggleTheme: () => void;
-  toggleLanguage: () => void;
+  handleSetLanguage: (lang: Language) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({ 
@@ -28,7 +28,7 @@ const Header: React.FC<HeaderProps> = ({
     language, 
     theme, 
     toggleTheme, 
-    toggleLanguage 
+    handleSetLanguage 
 }) => {
   const t = {
     nl: {
@@ -44,6 +44,13 @@ const Header: React.FC<HeaderProps> = ({
       categorySubtitle: (title: string) => `Your briefing on the latest developments in ${title.toLowerCase()}.`,
       cpoSetupSubtitle: "Configure your AI expert for a strategy session.",
       cpoChatSubtitle: (title: string) => `Strategy session on ${title.toLowerCase()}.`
+    },
+    de: {
+      mainTitle: "Exact's Daily",
+      newspaperSubtitle: "Ihre personalisierte Titelseite, generiert mit KI.",
+      categorySubtitle: (title: string) => `Ihr Briefing zu den neuesten Entwicklungen in ${title.toLowerCase()}.`,
+      cpoSetupSubtitle: "Konfigurieren Sie Ihren KI-Experten für eine Strategiesitzung.",
+      cpoChatSubtitle: (title: string) => `Strategiesitzung zu ${title.toLowerCase()}.`
     }
   }
 
@@ -73,8 +80,8 @@ const Header: React.FC<HeaderProps> = ({
           </button>
         </div>
         <div className="flex items-center space-x-3">
-          <LanguageSwitcher language={language} toggleLanguage={toggleLanguage} />
-          <ThemeSwitcher theme={theme} toggleTheme={toggleLanguage} language={language} />
+          <LanguageSwitcher language={language} setLanguage={handleSetLanguage} />
+          <ThemeSwitcher theme={theme} toggleTheme={toggleTheme} language={language} />
         </div>
       </div>
        {!hideSubtitle && subtitle && (

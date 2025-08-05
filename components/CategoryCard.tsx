@@ -31,6 +31,14 @@ const CategoryCard: React.FC<CategoryCardProps> = ({ category, onSelect, onAskEx
       startSession: 'Start Session',
       addFavorite: 'Add to favorites', 
       removeFavorite: 'Remove from favorites' 
+    },
+    de: {
+      select: `Kategorie auswählen: ${title}`,
+      readNews: 'Nachrichten lesen',
+      askExpert: 'Experten fragen',
+      startSession: 'Sitzung starten',
+      addFavorite: 'Zu Favoriten hinzufügen',
+      removeFavorite: 'Aus Favoriten entfernen'
     }
   }
 

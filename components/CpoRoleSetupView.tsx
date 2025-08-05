@@ -38,7 +38,15 @@ const CpoRoleSetupView: React.FC<CpoRoleSetupViewProps> = ({ categories, roles, 
       step2Placeholder: 'First, choose an area of expertise',
       startChat: 'Start Strategy Session',
       selected: 'Selected',
-    }
+    },
+    de: {
+      back: "Zurück zur Übersicht",
+      step1: "Schritt 1: Wählen Sie ein Fachgebiet",
+      step2: "Schritt 2: Wählen Sie eine Rolle für den KI-Experten",
+      step2Placeholder: "Wählen Sie zuerst ein Fachgebiet",
+      startChat: "Strategiesitzung starten",
+      selected: "Ausgewählt",
+    },
   };
 
   return (

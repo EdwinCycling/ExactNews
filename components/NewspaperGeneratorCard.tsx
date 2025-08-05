@@ -27,6 +27,15 @@ const NewspaperGeneratorCard: React.FC<NewspaperGeneratorCardProps> = ({ onGener
       descEnabled: "Create a unique newspaper front page based on your favorites.",
       iconTitle: "Newspaper icon",
       includesCategories: 'Including the following categories:'
+    },
+    de: {
+      tooltipDisabled: "Wählen Sie mindestens 1 Lieblingskategorie aus, um eine Zeitung zu erstellen.",
+      tooltipEnabled: "Erstellen Sie die Titelseite von Exact's Daily",
+      title: "Erstellen Sie die Zeitung Exact's Daily",
+      descDisabled: "Wählen Sie 1 oder mehrere Lieblingskategorien aus.",
+      descEnabled: "Erstellen Sie eine einzigartige Zeitungs-Titelseite basierend auf Ihren Favoriten.",
+      iconTitle: "Zeitungs-Symbol",
+      includesCategories: 'Einschließlich der folgenden Kategorien:'
     }
   }
 
