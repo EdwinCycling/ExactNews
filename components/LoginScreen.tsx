@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Language } from '../types';
 
 interface LoginScreenProps {
@@ -10,6 +10,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, language }) => {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   const t = {
     nl: {
@@ -20,6 +21,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, language }) => {
       unexpectedError: "Er is een onverwachte fout opgetreden. Controleer de console.",
       loading: "Controleren...",
       delete: "Wissen",
+      showPassword: "Toon wachtwoord",
+      hidePassword: "Verberg wachtwoord",
     },
     en: {
       title: "Welcome to Exact's AI Daily",
@@ -29,6 +32,8 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, language }) => {
       unexpectedError: "An unexpected error occurred. Check the console.",
       loading: "Checking...",
       delete: "Delete",
+      showPassword: "Show password",
+      hidePassword: "Hide password",
     },
     de: {
       title: "Willkommen bei Exact's AI Daily",
@@ -38,8 +43,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, language }) => {
       unexpectedError: "Ein unerwarteter Fehler ist aufgetreten. Überprüfen Sie die Konsole.",
       loading: "Überprüfen...",
       delete: "Löschen",
+      showPassword: "Passwort anzeigen",
+      hidePassword: "Passwort ausblenden",
     }
   };
+
+  // Auto-focus on the first input field when component mounts
+  useEffect(() => {
+    const firstInput = document.querySelector('input[type="text"]') as HTMLInputElement;
+    if (firstInput) {
+      firstInput.focus();
+    }
+  }, []);
 
   const handleDigitClick = (digit: number) => {
     if (isLoading || code.length >= 4) return;
@@ -96,9 +111,35 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, language }) => {
                 ${code[i] ? 'bg-teal-400/20 border-teal-500 text-teal-500' : 'bg-slate-100 dark:bg-gray-700 border-slate-300 dark:border-gray-600'}
               `}
             >
-              {code[i] ? '●' : ''}
+              {code[i] ? (showPassword ? code[i] : '●') : ''}
             </div>
           ))}
+        </div>
+
+        {/* Password visibility toggle */}
+        <div className="flex justify-center mb-4">
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="flex items-center space-x-2 text-sm text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+          >
+            {showPassword ? (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21"></path>
+                </svg>
+                <span>{t[language].hidePassword}</span>
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+                <span>{t[language].showPassword}</span>
+              </>
+            )}
+          </button>
         </div>
 
         {error ? <p className="text-red-500 text-sm mb-4">{error}</p> : <div className="h-6 mb-4"></div> /* Placeholder */}

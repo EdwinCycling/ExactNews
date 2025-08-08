@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ChatMessage, Language, Category } from '../types';
+import { ChatMessage, Language, Category, ChatMemory } from '../types';
+import { saveChatMemory, loadChatMemory, deleteChatMemory } from '../services/firebase';
+import { auth } from '../services/firebase';
+import Toast from './Toast';
 
 interface ChatViewProps {
   history: ChatMessage[];
@@ -11,11 +14,33 @@ interface ChatViewProps {
   feedbacks: { [index: number]: 'up' | null };
   onSetFeedback: (messageIndex: number, feedback: 'up') => void;
   onDeleteMessage: (messageIndex: number) => void;
+
+  showMemoryButton?: boolean;
 }
 
-export const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLoading, language, selectedCategory, isExpertMode = false, feedbacks, onSetFeedback, onDeleteMessage }) => {
+export const ChatView: React.FC<ChatViewProps> = ({ 
+  history, 
+  onSendMessage, 
+  isLoading, 
+  language, 
+  selectedCategory, 
+  isExpertMode = false, 
+  feedbacks, 
+  onSetFeedback, 
+  onDeleteMessage,
+
+  showMemoryButton = false
+}) => {
   const [input, setInput] = useState('');
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [memoryLoading, setMemoryLoading] = useState(false);
+  const [memoryExists, setMemoryExists] = useState(false);
+  const [showDeleteConfirmation, setShowDeleteConfirmation] = useState(false);
+  const [toast, setToast] = useState<{ isVisible: boolean; message: string; type: 'success' | 'error' | 'info' }>({
+    isVisible: false,
+    message: '',
+    type: 'info'
+  });
   const chatEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -25,46 +50,246 @@ export const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLo
       subtitle: isExpertMode ? "" : (selectedCategory ? `Stel een vraag over de bovenstaande artikelen of over ${selectedCategory.title.nl}` : 'Stel een vraag over de bovenstaande artikelen.'),
       placeholder: "Typ uw vraag...",
       send: "Verzenden",
-      typing: "AI typt...",
+      typing: "AI is aan het werk",
       disclaimer: "ED kan fouten maken. Controleer belangrijke informatie.",
       copy: "Kopieer tekst",
       copied: "Gekopieerd!",
       thumbUp: "Antwoord was nuttig",
       thumbDown: "Verwijder dit antwoord en de vraag",
+      memory: "Geheugen",
+      saveMemory: "Chat opslaan",
+      loadMemory: "Chat laden",
+      deleteMemory: "Opslag wissen",
+      memorySaved: "Chat opgeslagen!",
+      memoryLoaded: "Chat geladen!",
+      memoryDeleted: "Geheugen gewist!",
+      memoryError: "Fout bij geheugen operatie",
+      noMemory: "Geen opgeslagen chat gevonden",
+      confirmDelete: "Weet je zeker dat je het geheugen wilt wissen?",
     },
     en: {
       title: selectedCategory ? `Ask the ${selectedCategory.title.en} Expert` : "Ask the Data",
       subtitle: isExpertMode ? "" : (selectedCategory ? `Ask a question about the articles above or about ${selectedCategory.title.en}` : 'Ask a question about the articles above.'),
       placeholder: "Type your question...",
       send: "Send",
-      typing: "AI is typing...",
+      typing: "AI is working...",
       disclaimer: "ED can make mistakes. Please check important information.",
       copy: "Copy text",
       copied: "Copied!",
       thumbUp: "Answer was helpful",
       thumbDown: "Delete this response and question",
+      memory: "Memory",
+      saveMemory: "Save Chat",
+      loadMemory: "Load Chat",
+      deleteMemory: "Clear Storage",
+      memorySaved: "Chat saved!",
+      memoryLoaded: "Chat loaded!",
+      memoryDeleted: "Memory cleared!",
+      memoryError: "Memory operation failed",
+      noMemory: "No saved chat found",
+      confirmDelete: "Are you sure you want to clear the memory?",
     },
     de: {
       title: selectedCategory ? `Fragen Sie den ${selectedCategory.title.de} Experten` : "Fragen Sie die Daten",
       subtitle: isExpertMode ? "" : (selectedCategory ? `Stellen Sie eine Frage zu den obigen Artikeln oder zu ${selectedCategory.title.de}` : 'Stellen Sie eine Frage zu den obigen Artikeln.'),
       placeholder: "Geben Sie Ihre Frage ein...",
       send: "Senden",
-      typing: "KI tippt...",
+      typing: "KI arbeitet...",
       disclaimer: "ED kann Fehler machen. Bitte überprüfen Sie wichtige Informationen.",
       copy: "Text kopieren",
       copied: "Kopiert!",
       thumbUp: "Antwort war hilfreich",
       thumbDown: "Diese Antwort und Frage löschen",
+      memory: "Gedächtnis",
+      saveMemory: "Chat speichern",
+      loadMemory: "Chat laden",
+      deleteMemory: "Speicher löschen",
+      memorySaved: "Chat gespeichert!",
+      memoryLoaded: "Chat geladen!",
+      memoryDeleted: "Gedächtnis gelöscht!",
+      memoryError: "Gedächtnis-Operation fehlgeschlagen",
+      noMemory: "Kein gespeicherter Chat gefunden",
+      confirmDelete: "Sind Sie sicher, dass Sie das Gedächtnis löschen möchten?",
     },
   }
-  
+
+  // Check if memory exists on component mount and when user changes
+  useEffect(() => {
+    console.log('ChatView useEffect - showMemoryButton:', showMemoryButton, 'isExpertMode:', isExpertMode);
+    // Always check memory exists when user is authenticated, regardless of showMemoryButton
+    if (auth.currentUser) {
+      checkMemoryExists();
+    }
+  }, [auth.currentUser?.uid]);
+
+  // Debug useEffect to track memoryExists changes
+  useEffect(() => {
+    console.log('=== memoryExists State Changed ===');
+    console.log('memoryExists:', memoryExists);
+    console.log('auth.currentUser:', !!auth.currentUser);
+    console.log('Should show load button:', auth.currentUser && memoryExists);
+    console.log('=== End memoryExists State ===');
+  }, [memoryExists]);
+
+  const checkMemoryExists = async () => {
+    console.log('=== Memory Check Debug ===');
+    console.log('auth.currentUser:', auth.currentUser);
+    console.log('auth.currentUser?.uid:', auth.currentUser?.uid);
+    console.log('showMemoryButton:', showMemoryButton);
+    console.log('isExpertMode:', isExpertMode);
+    
+    if (!auth.currentUser) {
+      console.log('No authenticated user for memory check');
+      setMemoryExists(false);
+      return;
+    }
+    
+    try {
+      console.log('Loading memory for user:', auth.currentUser.uid);
+      const memory = await loadChatMemory(auth.currentUser.uid);
+      setMemoryExists(!!memory);
+      console.log('Memory exists:', !!memory);
+      console.log('Memory data:', memory);
+      console.log('=== End Memory Check ===');
+    } catch (error) {
+      console.error('Error checking memory:', error);
+      setMemoryExists(false);
+    }
+  };
+
+
+
+  const handleSaveMemory = async () => {
+    console.log('Save memory clicked - auth.currentUser:', auth.currentUser);
+    console.log('Selected category:', selectedCategory);
+    console.log('History length:', history.length);
+    
+    if (!auth.currentUser) {
+      setToast({ isVisible: true, message: 'Je moet ingelogd zijn om chat geheugen op te slaan. Log eerst in via de login pagina.', type: 'error' });
+      return;
+    }
+    
+    if (!selectedCategory) {
+      setToast({ isVisible: true, message: 'Geen categorie geselecteerd voor geheugen opslag', type: 'error' });
+      return;
+    }
+    
+    if (history.length === 0) {
+      setToast({ isVisible: true, message: 'Geen chat geschiedenis om op te slaan', type: 'error' });
+      return;
+    }
+    
+    setMemoryLoading(true);
+    try {
+      // Create an extensive summary of the chat
+      const userMessages = history.filter(msg => msg.role === 'user').map(msg => msg.parts[0].text);
+      const aiMessages = history.filter(msg => msg.role === 'model').map(msg => msg.parts[0].text);
+      
+      let extensiveSummary = `Chat Summary (${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}):\n\n`;
+      extensiveSummary += `Category: ${selectedCategory.title[language]}\n`;
+      extensiveSummary += `Total Messages: ${history.length}\n\n`;
+      
+      // Add key points from the conversation
+      extensiveSummary += `Key Discussion Points:\n`;
+      userMessages.forEach((msg, index) => {
+        if (index < 5) { // Limit to first 5 user messages for summary
+          extensiveSummary += `- User: ${msg.substring(0, 100)}${msg.length > 100 ? '...' : ''}\n`;
+          if (aiMessages[index]) {
+            extensiveSummary += `  AI: ${aiMessages[index].substring(0, 150)}${aiMessages[index].length > 150 ? '...' : ''}\n\n`;
+          }
+        }
+      });
+      
+      if (userMessages.length > 5) {
+        extensiveSummary += `... and ${userMessages.length - 5} more messages\n`;
+      }
+      
+             await saveChatMemory(
+         auth.currentUser.uid,
+         extensiveSummary,
+         selectedCategory,
+         undefined // role is optional, pass undefined explicitly
+       );
+      
+      setMemoryExists(true);
+      setToast({ isVisible: true, message: t[language].memorySaved, type: 'success' });
+    } catch (error) {
+      console.error('Error saving memory:', error);
+      console.error('Error details:', {
+        code: (error as any).code,
+        message: (error as any).message,
+        userId: auth.currentUser?.uid,
+        category: selectedCategory?.key
+      });
+      
+      // Give more specific error messages
+      if ((error as any).code === 'permission-denied') {
+        setToast({ isVisible: true, message: 'Geen toestemming om geheugen op te slaan. Controleer je Firebase regels.', type: 'error' });
+      } else if ((error as any).code === 'unavailable') {
+        setToast({ isVisible: true, message: 'Firebase is momenteel niet beschikbaar. Probeer het later opnieuw.', type: 'error' });
+      } else {
+        setToast({ isVisible: true, message: `Fout bij opslaan geheugen: ${(error as any).message || 'Onbekende fout'}`, type: 'error' });
+      }
+    } finally {
+      setMemoryLoading(false);
+    }
+  };
+
+  const handleLoadMemory = async () => {
+    if (!auth.currentUser) return;
+    
+    setMemoryLoading(true);
+    try {
+      const memory = await loadChatMemory(auth.currentUser.uid);
+      if (memory) {
+        // Directly send the summary to AI, similar to "suggested next question"
+        onSendMessage(memory.extensiveSummary);
+        setToast({ isVisible: true, message: t[language].memoryLoaded, type: 'success' });
+      } else {
+        setToast({ isVisible: true, message: t[language].noMemory, type: 'error' });
+      }
+    } catch (error) {
+      console.error('Error loading memory:', error);
+      setToast({ isVisible: true, message: t[language].memoryError, type: 'error' });
+    } finally {
+      setMemoryLoading(false);
+    }
+  };
+
+  const handleDeleteMemory = async () => {
+    if (!auth.currentUser) return;
+    
+    // Show confirmation dialog
+    setShowDeleteConfirmation(true);
+  };
+
+  const confirmDeleteMemory = async () => {
+    if (!auth.currentUser) return;
+    
+    setShowDeleteConfirmation(false);
+    setMemoryLoading(true);
+    try {
+      await deleteChatMemory(auth.currentUser.uid);
+      setMemoryExists(false);
+      setToast({ isVisible: true, message: t[language].memoryDeleted, type: 'success' });
+    } catch (error) {
+      console.error('Error deleting memory:', error);
+      setToast({ isVisible: true, message: t[language].memoryError, type: 'error' });
+    } finally {
+      setMemoryLoading(false);
+    }
+  };
+
+  const cancelDeleteMemory = () => {
+    setShowDeleteConfirmation(false);
+  };
+
   // Autofocus the input on component mount, especially for expert chat mode.
   useEffect(() => {
     if (isExpertMode) {
       inputRef.current?.focus();
     }
   }, [isExpertMode]);
-
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -116,14 +341,156 @@ export const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLo
     });
   };
 
+  // Debug log at render time
+  console.log('=== ChatView Render Debug ===');
+  console.log('memoryExists:', memoryExists);
+  console.log('auth.currentUser:', !!auth.currentUser);
+  console.log('Should show load button:', auth.currentUser && memoryExists);
+  console.log('=== End Render Debug ===');
+
   return (
-    <div className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
+    <>
+      <Toast
+        isVisible={toast.isVisible}
+        message={toast.message}
+        type={toast.type}
+        onClose={() => setToast({ ...toast, isVisible: false })}
+        language={language}
+      />
+      
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirmation && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full mx-4 shadow-xl">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
+              {t[language].memory}
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              {t[language].confirmDelete}
+            </p>
+            <div className="flex space-x-3">
+              <button
+                onClick={cancelDeleteMemory}
+                className="flex-1 px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Annuleren
+              </button>
+              <button
+                onClick={confirmDeleteMemory}
+                disabled={memoryLoading}
+                className="flex-1 px-4 py-2 text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                {memoryLoading ? (
+                  <div className="flex items-center justify-center">
+                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Wissen...
+                  </div>
+                ) : (
+                  'Wissen'
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      <div className="bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[70vh]">
       {!isExpertMode && (
         <div className="p-6 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-2xl font-bold text-slate-800 dark:text-slate-200">{t[language].title}</h2>
             <p className="text-slate-500 dark:text-slate-400 mt-1">{t[language].subtitle}</p>
         </div>
       )}
+      
+      {/* Memory Button for Expert Mode */}
+      {isExpertMode && (
+        <div className="p-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+          <div className="flex items-center justify-between">
+                         <div className="flex items-center space-x-2">
+               <svg className="h-5 w-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+               </svg>
+               <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{t[language].memory}</span>
+               {!auth.currentUser && (
+                 <span className="text-xs text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/50 px-2 py-1 rounded">
+                   Niet ingelogd
+                 </span>
+               )}
+             </div>
+            
+                         <div className="flex items-center space-x-2">
+               {/* Show save button only if user is logged in and there's chat history */}
+               {auth.currentUser && history.length > 0 && (
+                 <button
+                   onClick={handleSaveMemory}
+                   disabled={memoryLoading}
+                   className="px-3 py-1.5 text-xs font-medium text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900/50 rounded-lg hover:bg-green-200 dark:hover:bg-green-900/70 transition-colors disabled:opacity-50"
+                 >
+                   {memoryLoading ? (
+                     <div className="flex items-center">
+                       <svg className="animate-spin -ml-1 mr-1 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                       </svg>
+                       {t[language].saveMemory}
+                     </div>
+                   ) : (
+                     t[language].saveMemory
+                   )}
+                 </button>
+               )}
+               
+                               {/* Show load button only if memory exists */}
+                {auth.currentUser && memoryExists && (
+                  <button
+                    onClick={handleLoadMemory}
+                    disabled={memoryLoading}
+                    className="px-3 py-1.5 text-xs font-medium text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 rounded-lg hover:bg-blue-200 dark:hover:bg-blue-900/70 transition-colors disabled:opacity-50"
+                  >
+                    {memoryLoading ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-1 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {t[language].loadMemory}
+                      </div>
+                    ) : (
+                      t[language].loadMemory
+                    )}
+                  </button>
+                )}
+               
+                               {/* Show delete button only if memory exists and there's chat history */}
+                {auth.currentUser && memoryExists && history.length > 0 && (
+                  <button
+                    onClick={handleDeleteMemory}
+                    disabled={memoryLoading}
+                    className="px-3 py-1.5 text-xs font-medium text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/50 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/70 transition-colors disabled:opacity-50"
+                  >
+                    {memoryLoading ? (
+                      <div className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-1 h-3 w-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        {t[language].deleteMemory}
+                      </div>
+                    ) : (
+                      t[language].deleteMemory
+                    )}
+                  </button>
+                )}
+                
+
+             </div>
+          </div>
+        </div>
+      )}
+      
       <div className="flex-1 overflow-y-auto p-6 space-y-6">
         {history.map((msg, index) => {
           const isUser = msg.role === 'user';
@@ -194,6 +561,7 @@ export const ChatView: React.FC<ChatViewProps> = ({ history, onSendMessage, isLo
             {isLoading ? <span className="animate-pulse">{t[language].typing}</span> : t[language].disclaimer}
         </p>
       </form>
-    </div>
+      </div>
+    </>
   );
 };

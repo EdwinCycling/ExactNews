@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { Chat } from '@google/genai';
 import { streamNewsAndSummaries, fetchFrontPageArticles, createChatSession, generateArticlesSummary, generateChatSummaryAndActions, generateInfographic, generateBookRecommendations, generateReadingTableLinks, generateTedTalks, generateLinkedInLearningCourses } from './services/geminiService';
-import { Article, AppState, SortOrder, Category, Language, ChatMessage, RoleTemplate, ChatSummary, ReadingLink, Book, TedTalkResponse, LinkedInLearningCourse } from './types';
+import { Article, AppState, SortOrder, Category, Language, ChatMessage, RoleTemplate, ChatSummary, ReadingLink, Book, TedTalkResponse, LinkedInLearningCourse, ChatMemory, Department } from './types';
 import Header from './components/Header';
 import ArticleCard from './components/ArticleCard';
 import ErrorMessage from './components/ErrorMessage';
@@ -20,9 +20,13 @@ import LoginScreen from './components/LoginScreen';
 import CpoRoleSetupView from './components/CpoRoleSetupView';
 import CpoRoleChatView from './components/CpoRoleChatView';
 import CpoChatPrintView from './components/CpoChatPrintView';
-
-// Plaintext secret code for maximum reliability in all environments.
-const SECRET_CODE = '8641';
+import AuthWrapper from "./components/AuthWrapper";
+import { loadChatMemory } from './services/firebase';
+import { auth } from './services/firebase';
+import MainSelectionView from './components/MainSelectionView';
+import DepartmentSelectionView from './components/DepartmentSelectionView';
+import SummaryActionsPanel from './components/SummaryActionsPanel';
+import { DEPARTMENTS } from './departmentRoles';
 
 const CATEGORIES: Category[] = [
   {
@@ -145,24 +149,27 @@ const CATEGORIES: Category[] = [
 ];
 
 const ROLES: RoleTemplate[] = [
-  { key: 'beginner', title: {nl: 'Beginnersgids', en: 'Beginner\'s Guide', de: 'Anfängerleitfaden'}, text: { nl: 'Gedraag je als een expert met 20 jaar ervaring in {category}. Breek de kernprincipes op die een totale beginner moet begrijpen. Gebruik analogieën, stapsgewijze logica en vereenvoudig alles alsof ik een jonge student ben.', en: 'Pretend you are an expert with 20 years of experience in {category}. Break down the core principles a total beginner must understand. Use analogies, step-by-step logic, and simplify everything like I\'m a young student.', de: 'Tun Sie so, als wären Sie ein Experte mit 20 Jahren Erfahrung in {category}. Erläutern Sie die Grundprinzipien, die ein absoluter Anfänger verstehen muss. Verwenden Sie Analogien, schrittweise Logik und vereinfachen Sie alles, als wäre ich ein junger Student.' } },
-  { key: 'sparring_partner', title: {nl: 'Sparringpartner', en: 'Thought Partner', de: 'Sparringspartner'}, text: { nl: 'Fungeer als mijn persoonlijke sparringpartner met 20 jaar ervaring in {category}. Ik zal {mijn idee/probleem} beschrijven, en ik wil dat je elke aanname in twijfel trekt, blinde vlekken aanwijst en me helpt het te evolueren naar iets dat 10x beter is.', en: 'Act as my personal thought partner with 20 years of experience in {category}. I’ll describe {my idea/problem}, and I want you to question every assumption, point out blind spots, and help me evolve it into something 10x better.', de: 'Handeln Sie als mein persönlicher Sparringspartner mit 20 Jahren Erfahrung in {category}. Ich beschreibe {meine Idee/Problem}, und ich möchte, dass Sie jede Annahme in Frage stellen, blinde Flecken aufzeigen und mir helfen, es zu etwas zu entwickeln, das 10x besser ist.' } },
-  { key: 'copywriter', title: {nl: 'Copywriter', en: 'Copywriter', de: 'Texter'}, text: { nl: 'Je bent een copywriter van wereldklasse met 20 jaar ervaring in {category}. Help me mijn {landingspagina/salespitch/e-mail} te herschrijven om beter te converteren. Maak het krachtig, beknopt en overtuigend. Gebruik bewezen frameworks.', en: 'You\'re a world-class copywriter with 20 years of experience in {category}. Help me rewrite my {landing page/sales pitch/email} to convert better. Make it punchy, concise, and persuasive. Use proven frameworks.', de: 'Sie sind ein Weltklasse-Texter mit 20 Jahren Erfahrung in {category}. Helfen Sie mir, meine {Landingpage/Verkaufsgespräch/E-Mail} neu zu schreiben, um besser zu konvertieren. Machen Sie es prägnant, konzise und überzeugend. Verwenden Sie bewährte Frameworks.' } },
-  { key: 'it_manager', title: {nl: 'Nobelprijs-winnende IT-manager', en: 'Nobel-winning IT Manager', de: 'Nobelpreisgekrönter IT-Manager'}, text: { nl: 'Gedraag je als een Nobelprijs-winnende IT-manager. Analyseer mijn ideeën, geef kritische feedback met voor- en nadelen, adviseer wat ik niet moet vergeten en help me de gaten in te vullen.', en: 'Act like a Nobel-winning IT manager. Analyze my ideas. give critical feedback with pros and cons and advice what not to forget and help me filling in gaps.', de: 'Handeln Sie wie ein mit dem Nobelpreis ausgezeichneter IT-Manager. Analysieren Sie meine Ideen, geben Sie kritisches Feedback mit Vor- und Nachteilen, beraten Sie, was nicht zu vergessen ist, und helfen Sie mir, die Lücken zu füllen.' } },
-  { key: 'mentor', title: {nl: 'Startup Mentor', en: 'Startup Mentor', de: 'Startup-Mentor'}, text: { nl: 'Wees mijn startup-mentor met 20 jaar ervaring in {category}. Ik heb dit idee: {idee}. Help me het te verfijnen, de markt te valideren, monetatie-opties te ontdekken en een roadmap van MVP naar CashCow uit te stippelen.', en: 'Be my startup mentor with 20 years of experience in {category}. I have this idea: {idea}. Help me refine it, validate the market, uncover monetization options, and outline a roadmap from MVP to CashCow.', de: 'Seien Sie mein Startup-Mentor mit 20 Jahren Erfahrung in {category}. Ich habe diese Idee: {Idee}. Helfen Sie mir, sie zu verfeinern, den Markt zu validieren, Monetarisierungsoptionen aufzudecken und eine Roadmap vom MVP zur CashCow zu skizzieren.' } },
-  { key: 'teacher', title: {nl: 'Leraar voor beginnende HBO-student', en: 'Teacher for a College Student', de: 'Lehrer für einen Studenten'}, text: { nl: 'Leer me {elk complex onderwerp} alsof ik een beginnende HBO-student ben. Gebruik eenvoudige taal, metaforen en voorbeelden. Na elke uitleg, overhoor me om mijn begrip te controleren en het leren te versterken.', en: 'Teach me {any complex skill or topic} like I’m a first-year college student. Use simple language, metaphors, and examples. After each explanation, quiz me to check my understanding and reinforce learning.', de: 'Lehren Sie mich {jede komplexe Fähigkeit oder jedes Thema}, als wäre ich ein Studienanfänger. Verwenden Sie einfache Sprache, Metaphern und Beispiele. Fragen Sie mich nach jeder Erklärung ab, um mein Verständnis zu überprüfen und das Lernen zu festigen.' } },
-  { key: 'ghostwriter', title: {nl: 'Ghostwriter', en: 'Ghostwriter', de: 'Ghostwriter'}, text: { nl: 'Je bent mijn ghostwriter. Verander deze ruwe opsomming in een impactvolle {LinkedIn-post / Twitter-thread / Medium-artikel}. Houd het boeiend, duidelijk en afgestemd op {doelgroep}.', en: 'You’re my ghostwriter. Turn this rough bullet outline into a high-impact {LinkedIn post / Twitter thread / Medium article}. Keep it engaging, clear, and tailored to {target audience}.', de: 'Du bist mein Ghostwriter. Verwandle diesen groben Stichpunktentwurf in einen wirkungsvollen {LinkedIn-Post / Twitter-Thread / Medium-Artikel}. Halte ihn fesselnd, klar und auf {Zielgruppe} zugeschnitten.' } },
-  { key: 'life_coach', title: {nl: 'Levenscoach', en: 'Life Coach', de: 'Lebensberater'}, text: { nl: 'Gedraag je als mijn levenscoach. Ik voel me vastzitten omdat {beschrijf situatie}. Stel me 5 ongemakkelijke vragen om het kernprobleem te achterhalen. Geef me dan een bikkelhard actieplan om vooruit te komen.', en: 'Act like my life coach. I feel stuck because {describe situation}. Ask me 5 uncomfortable questions to uncover the root issue. Then give me a brutally honest action plan to move forward.', de: 'Handeln Sie wie mein Lebensberater. Ich fühle mich festgefahren, weil {Situation beschreiben}. Stellen Sie mir 5 unbequeme Fragen, um das Kernproblem aufzudecken. Geben Sie mir dann einen schonungslos ehrlichen Aktionsplan, um voranzukommen.' } },
-  { key: 'investor', title: {nl: 'Investeerder', en: 'Investor', de: 'Investor'}, text: { nl: 'Je bent een bikkelharde investeerder met 20 jaar ervaring in {category}. Ik pitch mijn ideeën. Haal ze onderuit. Wat is gebrekkig? Wat is veelbelovend? Wat ontbreekt er? Beoordeel het op markt-, product- en oprichter-fit. Geen opvulling, alleen echte feedback.', en: 'You’re a brutally honest investor with 20 years of experience in {category}. Pitch my ideas. Tear it apart. What’s flawed? What’s promising? What’s missing? Rate it on market, product, and founder fit. No fluff just real feedback.', de: 'Sie sind ein brutal ehrlicher Investor mit 20 Jahren Erfahrung in {category}. Pitchen Sie meine Ideen. Zerreißen Sie sie. Was ist fehlerhaft? Was ist vielversprechend? Was fehlt? Bewerten Sie es nach Markt-, Produkt- und Gründer-Fit. Kein Geschwafel, nur echtes Feedback.' } },
+  { key: 'beginner', title: {nl: 'Beginnersgids', en: "Beginner's Guide", de: 'Anfängerleitfaden'}, text: { nl: 'Gedraag je als een expert met 20 jaar ervaring in {category}. Breek de kernprincipes op die een totale beginner moet begrijpen. Gebruik analogieën, stapsgewijze logica en vereenvoudig alles alsof ik een jonge student ben.', en: "Pretend you are an expert with 20 years of experience in {category}. Break down the core principles a total beginner must understand. Use analogies, step-by-step logic, and simplify everything like I'm a young student.", de: 'Tun Sie so, als wären Sie ein Experte mit 20 Jahren Erfahrung in {category}. Erläutern Sie die Grundprinzipien, die ein absoluter Anfänger verstehen muss. Verwenden Sie Analogien, schrittweise Logik und vereinfachen Sie alles, als wäre ich ein junger Student.' } },
+  { key: 'sparring_partner', title: {nl: 'Sparringpartner', en: 'Thought Partner', de: 'Sparringspartner'}, text: { nl: 'Fungeer als mijn persoonlijke sparringpartner met 20 jaar ervaring in {category}. Ik zal {mijn idee/probleem} beschrijven, en ik wil dat je elke aanname in twijfel trekt, blinde vlekken aanwijst en me helpt het te evolueren naar iets dat 10x beter is.', en: "Act as my personal thought partner with 20 years of experience in {category}. I'll describe {my idea/problem}, and I want you to question every assumption, point out blind spots, and help me evolve it into something 10x better.", de: 'Handeln Sie als mein persönlicher Sparringspartner mit 20 Jahren Erfahrung in {category}. Ich beschreibe {meine Idee/Problem}, und ich möchte, dass Sie jede Annahme in Frage stellen, blinde Flecken aufzeigen und mir helfen, es zu etwas zu entwickeln, das 10x besser ist.' } },
+  { key: 'copywriter', title: {nl: 'Copywriter', en: 'Copywriter', de: 'Texter'}, text: { nl: 'Je bent een copywriter van wereldklasse met 20 jaar ervaring in {category}. Help me mijn {landingspagina/salespitch/e-mail} te herschrijven om beter te converteren. Maak het krachtig, beknopt en overtuigend. Gebruik bewezen frameworks.', en: "You're a world-class copywriter with 20 years of experience in {category}. Help me rewrite my {landing page/sales pitch/email} to convert better. Make it punchy, concise, and persuasive. Use proven frameworks.", de: 'Sie sind ein Weltklasse-Texter mit 20 Jahren Erfahrung in {category}. Helfen Sie mir, meine {Landingpage/Verkaufsgespräch/E-Mail} neu zu schreiben, um besser zu konvertieren. Machen Sie es prägnant, konzise und überzeugend. Verwenden Sie bewährte Frameworks.' } },
+  { key: 'it_manager', title: {nl: 'Nobelprijs-winnende IT-manager', en: 'Nobel-winning IT Manager', de: 'Nobelpreisgekrönter IT-Manager'}, text: { nl: 'Gedraag je als een Nobelprijs-winnende IT-manager. Analyseer mijn ideeën, geef kritische feedback met voor- en nadelen, adviseer wat ik niet moet vergeten en help me de gaten in te vullen.', en: "Act like a Nobel-winning IT manager. Analyze my ideas. give critical feedback with pros and cons and advice what not to forget and help me filling in gaps.", de: 'Handeln Sie wie ein mit dem Nobelpreis ausgezeichneten IT-Manager. Analysieren Sie meine Ideen, geben Sie kritisches Feedback mit Vor- und Nachteilen, beraten Sie, was nicht zu vergessen ist, und helfen Sie mir, die Lücken zu füllen.' } },
+  { key: 'mentor', title: {nl: 'Startup Mentor', en: 'Startup Mentor', de: 'Startup-Mentor'}, text: { nl: 'Wees mijn startup-mentor met 20 jaar ervaring in {category}. Ik heb dit idee: {idee}. Help me het te verfijnen, de markt te valideren, monetatie-opties te ontdekken en een roadmap van MVP naar CashCow uit te stippelen.', en: "Be my startup mentor with 20 years of experience in {category}. I have this idea: {idea}. Help me refine it, validate the market, uncover monetization options, and outline a roadmap from MVP to CashCow.", de: 'Seien Sie mein Startup-Mentor mit 20 Jahren Erfahrung in {category}. Ich habe diese Idee: {Idee}. Helfen Sie mir, sie zu verfeinern, den Markt zu validieren, Monetarisierungsoptionen aufzudecken und eine Roadmap vom MVP zur CashCow zu skizzieren.' } },
+  { key: 'teacher', title: {nl: 'Leraar voor beginnende HBO-student', en: 'Teacher for a College Student', de: 'Lehrer für einen Studenten'}, text: { nl: 'Leer me {elk complex onderwerp} alsof ik een beginnende HBO-student ben. Gebruik eenvoudige taal, metaforen en voorbeelden. Na elke uitleg, overhoor me om mijn begrip te controleren en het leren te versterken.', en: "Teach me {any complex skill or topic} like I'm a first-year college student. Use simple language, metaphors, and examples. After each explanation, quiz me to check my understanding and reinforce learning.", de: 'Lehren Sie mich {jede komplexe Fähigkeit oder jedes Thema}, als wäre ich ein Studienanfänger. Verwenden Sie einfache Sprache, Metaphern und Beispiele. Fragen Sie mich nach jeder Erklärung ab, um mein Verständnis zu überprüfen und das Lernen zu festigen.' } },
+  { key: 'ghostwriter', title: {nl: 'Ghostwriter', en: 'Ghostwriter', de: 'Ghostwriter'}, text: { nl: 'Je bent mijn ghostwriter. Verander deze ruwe opsomming in een impactvolle {LinkedIn-post / Twitter-thread / Medium-artikel}. Houd het boeiend, duidelijk en afgestemd op {doelgroep}.', en: "You're my ghostwriter. Turn this rough bullet outline into a high-impact {LinkedIn post / Twitter thread / Medium article}. Keep it engaging, clear, and tailored to {target audience}.", de: 'Du bist mein Ghostwriter. Verwandle diesen groben Stichpunktentwurf in einen wirkungsvollen {LinkedIn-Post / Twitter-Thread / Medium-Artikel}. Halte ihn fesselnd, klar und auf {Zielgruppe} zugeschnitten.' } },
+  { key: 'life_coach', title: {nl: 'Levenscoach', en: 'Life Coach', de: 'Lebensberater'}, text: { nl: 'Gedraag je als mijn levenscoach. Ik voel me vastzitten omdat {beschrijf situatie}. Stel me 5 ongemakkelijke vragen om het kernprobleem te achterhalen. Geef me dan een bikkelhard actieplan om vooruit te komen.', en: "Act like my life coach. I feel stuck because {describe situation}. Ask me 5 uncomfortable questions to uncover the root issue. Then give me a brutally honest action plan to move forward.", de: 'Handeln Sie wie mein Lebensberater. Ich fühle mich festgefahren, weil {Situation beschreiben}. Stellen Sie mir 5 unbequeme Fragen, um das Kernproblem aufzudecken. Geben Sie mir dann einen schonungslos ehrlichen Aktionsplan, um voranzukommen.' } },
+  { key: 'investor', title: {nl: 'Investeerder', en: 'Investor', de: 'Investor'}, text: { nl: 'Je bent een bikkelharde investeerder met 20 jaar ervaring in {category}. Ik pitch mijn ideeën. Haal ze onderuit. Wat is gebrekkig? Wat is veelbelovend? Wat ontbreekt er? Beoordeel het op markt-, product- en oprichter-fit. Geen opvulling, alleen echte feedback.', en: "You are a brutally honest investor with 20 years of experience in {category}. Pitch my ideas. Tear it apart. What is flawed? What is promising? What is missing? Rate it on market, product, and founder fit. No fluff just real feedback.", de: 'Sie sind ein brutal ehrlicher Investor mit 20 Jahren Erfahrung in {category}. Pitchen Sie meine Ideen. Zerreißen Sie sie. Was ist fehlerhaft? Was ist vielversprechend? Was fehlt? Bewerten Sie es nach Markt-, Produkt- und Gründer-Fit. Kein Geschwafel, nur echtes Feedback.' } },
   { key: 'strategist', title: {nl: 'Persoonlijke Strateeg', en: 'Personal Strategist', de: 'Persönlicher Stratege'}, text: { nl: 'Ik heb een persoonlijke strategie nodig. Ik geef je mijn doel. Geef me een maandplan. Deel het op per week. Neem specifieke acties, mijlpalen en gewoonten op. Maak het realistisch maar uitdagend genoeg. Geef tips en mogelijke valkuilen.', en: 'I need a personal strategy. I give you my goal. Give me a month plan. Break it down by week. Include specific actions, milestones, and habits. Make it realistic but challenging enough. Give tips and possible pitfalls.', de: 'Ich brauche eine persönliche Strategie. Ich gebe Ihnen mein Ziel. Geben Sie mir einen Monatsplan. Teilen Sie ihn nach Wochen auf. Fügen Sie spezifische Aktionen, Meilensteine und Gewohnheiten hinzu. Machen Sie es realistisch, aber herausfordernd genug. Geben Sie Tipps und mögliche Fallstricke.' } },
-  { key: 'futurist', title: {nl: 'Futurist', en: 'Futurist', de: 'Zukunftsforscher'}, text: { nl: 'Gedraag je als een futurist in {category} met 25 jaar ervaring. Herken trends, voorspel wat komen gaat en leg uit hoe ik me vandaag kan voorbereiden of ervan kan profiteren. Help me de verborgen parels te vinden. Stel relevante vragen en neem de leiding.', en: 'Pretend you are a futurist in {category} with 25 years experience. Spot trends, predict what’s coming next, and explain how I can prepare or take advantage of it today. Help me find the hidden gems. Ask me relevant questions, take the lead.', de: 'Tun Sie so, als wären Sie ein Zukunftsforscher in {category} mit 25 Jahren Erfahrung. Erkennen Sie Trends, sagen Sie voraus, was als Nächstes kommt, und erklären Sie, wie ich mich heute vorbereiten oder davon profitieren kann. Helfen Sie mir, die verborgenen Schätze zu finden. Stellen Sie mir relevante Fragen, übernehmen Sie die Führung.' } },
-  { key: 'ux_expert', title: {nl: 'UX & Creativiteit Expert', en: 'UX & Creativity Expert', de: 'UX- und Kreativitätsexperte'}, text: { nl: 'Fungeer als een UX- & creativiteitsexpert van wereldklasse met 20 jaar ervaring in {category}. Ik zal mijn {idee/product/interface} beschrijven, en ik wil dat je het laat exploderen met creatieve mogelijkheden en toevoegingen. Trek elke ontwerpkeuze in twijfel, stel gedurfde UX-verbeteringen voor en inspireer me met 3-5 innovatieve richtingen die fris, intuïtief en verrukkelijk aanvoelen voor de gebruiker. Leg uit waarom elk idee kan werken en hoe het de gebruikerservaring beïnvloedt.', en: 'Act as a world-class UX & creativity expert with 20 years of experience in {category}. I’ll describe my {idea/product/interface}, and I want you to explode it with creative possibilities and additions. Question every design choice, suggest bold UX improvements, and inspire me with 3–5 innovative directions that feel fresh, intuitive, and delightful for the user. Explain why each idea could work and how it impacts the user experience.', de: 'Handeln Sie als Weltklasse-UX- und Kreativitätsexperte mit 20 Jahren Erfahrung in {category}. Ich beschreibe meine {Idee/Produkt/Schnittstelle}, und ich möchte, dass Sie sie mit kreativen Möglichkeiten und Ergänzungen explodieren lassen. Stellen Sie jede Designentscheidung in Frage, schlagen Sie kühne UX-Verbesserungen vor und inspirieren Sie mich mit 3–5 innovativen Richtungen, die sich frisch, intuitiv und für den Benutzer erfreulich anfühlen. Erklären Sie, warum jede Idee funktionieren könnte und wie sie sich auf die Benutzererfahrung auswirkt.' } }
+  { key: 'futurist', title: {nl: 'Futurist', en: 'Futurist', de: 'Zukunftsforscher'}, text: { nl: 'Gedraag je als een futurist in {category} met 25 jaar ervaring. Herken trends, voorspel wat komen gaat en leg uit hoe ik me vandaag kan voorbereiden of ervan kan profiteren. Help me de verborgen parels te vinden. Stel relevante vragen en neem de leiding.', en: "Pretend you are a futurist in {category} with 25 years experience. Spot trends, predict what is coming next, and explain how I can prepare or take advantage of it today. Help me find the hidden gems. Ask me relevant questions, take the lead.", de: 'Tun Sie so, als wären Sie ein Zukunftsforscher in {category} mit 25 Jahren Erfahrung. Erkennen Sie Trends, sagen Sie voraus, was als Nächstes kommt, und erklären Sie, wie ich mich heute vorbereiten oder davon profitieren kann. Helfen Sie mir, die verborgenen Schätze zu finden. Stellen Sie mir relevante Fragen, übernehmen Sie die Führung.' } },
+  { key: 'ux_expert', title: {nl: 'UX & Creativiteit Expert', en: 'UX & Creativity Expert', de: 'UX- und Kreativitätsexperte'}, text: { nl: 'Fungeer als een UX- & creativiteitsexpert van wereldklasse met 20 jaar ervaring in {category}. Ik zal mijn {idee/product/interface} beschrijven, en ik wil dat je het laat exploderen met creatieve mogelijkheden en toevoegingen. Trek elke ontwerpkeuze in twijfel, stel gedurfde UX-verbeteringen voor en inspireer me met 3-5 innovatieve richtingen die fris, intuïtief en verrukkelijk aanvoelen voor de gebruiker. Leg uit waarom elk idee kan werken en hoe het de gebruikerservaring beïnvloedt.', en: "Act as a world-class UX & creativity expert with 20 years of experience in {category}. I will describe my {idea/product/interface}, and I want you to explode it with creative possibilities and additions. Question every design choice, suggest bold UX improvements, and inspire me with 3–5 innovative directions that feel fresh, intuitive, and delightful for the user. Explain why each idea could work and how it impacts the user experience.", de: 'Handeln Sie als Weltklasse-UX- und Kreativitätsexperte mit 20 Jahren Erfahrung in {category}. Ich beschreibe meine {Idee/Produkt/Schnittstelle}, und ich möchte, dass Sie sie mit kreativen Möglichkeiten und Ergänzungen explodieren lassen. Stellen Sie jede Designentscheidung in Frage, schlagen Sie kühne UX-Verbesserungen vor und inspirieren Sie mich mit 3–5 innovativen Richtungen, die sich frisch, intuitiv und für den Benutzer erfreulich anfühlen. Erklären Sie, warum jede Idee funktionieren könnte und wie sie sich auf die Benutzererfahrung auswirkt.' } },
 ];
 
+// Plaintext secret code for maximum reliability in all environments.
+const SECRET_CODE = '8641';
+
 const App: React.FC = () => {
-  type View = 'categories' | 'articles' | 'newspaperLoading' | 'newspaperView' | 'expertChat' | 'info' | 'cpoRoleSetup' | 'cpoRoleChat' | 'cpoChatPrint';
+  type View = 'mainSelection' | 'newsCategories' | 'articles' | 'newspaperLoading' | 'newspaperView' | 'departmentSelection' | 'expertChat' | 'info' | 'cpoRoleSetup' | 'cpoRoleChat' | 'cpoChatPrint';
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
-  const [view, setView] = useState<View>('categories');
+  const [view, setView] = useState<View>('mainSelection');
   
   const [appState, setAppState] = useState<AppState>('idle');
   const [articles, setArticles] = useState<Article[]>([]);
@@ -218,12 +225,12 @@ const App: React.FC = () => {
   const [userContext, setUserContext] = useState<string>('');
   const [messageFeedbacks, setMessageFeedbacks] = useState<{ [index: number]: 'up' | null }>({});
   const [infographicImage, setInfographicImage] = useState<string | null>(null);
-  const [isInfographicLoading, setIsInfographicLoading] = useState<boolean>(false);
-  const [showInfographicModal, setShowInfographicModal] = useState<boolean>(false);
-  const [infographicGenerationCount, setInfographicGenerationCount] = useState<number>(0);
-  const [includeInfographicInReport, setIncludeInfographicInReport] = useState<boolean>(true);
-  const [summaryPodcastCount, setSummaryPodcastCount] = useState<number>(0);
-  const [actionsPodcastCount, setActionsPodcastCount] = useState<number>(0);
+  const [showInfographicModal, setShowInfographicModal] = useState(false);
+  const [isInfographicLoading, setIsInfographicLoading] = useState(false);
+  const [infographicGenerationCount, setInfographicGenerationCount] = useState(0);
+  const [includeInfographicInReport, setIncludeInfographicInReport] = useState(false);
+  const [summaryPodcastCount, setSummaryPodcastCount] = useState(0);
+  const [actionsPodcastCount, setActionsPodcastCount] = useState(0);
   const [readingLinks, setReadingLinks] = useState<ReadingLink[]>([]);
   const [isReadingLinksLoading, setIsReadingLinksLoading] = useState(false);
   const [books, setBooks] = useState<Book[]>([]);
@@ -232,6 +239,9 @@ const App: React.FC = () => {
   const [isTedTalksLoading, setIsTedTalksLoading] = useState(false);
   const [linkedInCourses, setLinkedInCourses] = useState<LinkedInLearningCourse[]>([]);
   const [isLinkedInCoursesLoading, setIsLinkedInCoursesLoading] = useState(false);
+  const [userMemory, setUserMemory] = useState<ChatMemory | null>(null);
+  const [memoryLoading, setMemoryLoading] = useState(false);
+  const [selectedDepartment, setSelectedDepartment] = useState<Department | null>(null);
 
   
   const { play, cancel } = useTextToSpeech({
@@ -341,6 +351,7 @@ const App: React.FC = () => {
     if (code === SECRET_CODE) {
       setIsAuthenticated(true);
       sessionStorage.setItem('isAuthenticated', 'true');
+      setView('mainSelection'); // Set view to main selection after login
       return true;
     }
     return false;
@@ -428,9 +439,52 @@ const App: React.FC = () => {
     setView('info');
   }
 
+  const handleSelectNews = () => {
+    setView('newsCategories');
+  };
+
+  const handleSelectAIBuddy = () => {
+    setView('departmentSelection');
+  };
+
+  const handleSelectDepartment = (department: Department) => {
+    setSelectedDepartment(department);
+    
+    // For departments that don't need expertise area selection, go directly to role setup
+    if (department.key === 'hr' || department.key === 'cfo' || department.key === 'jij') {
+      setView('cpoRoleSetup');
+    } else {
+      setView('cpoRoleSetup');
+    }
+  };
+
+  const handleGoBackToMain = () => {
+    setView('mainSelection');
+    setSelectedDepartment(null);
+  };
+
+  const handleGoBackToDepartments = () => {
+    setView('departmentSelection');
+    setSelectedDepartment(null);
+  };
+
   const handleGoBack = () => {
     cancel();
-    setView('categories');
+    // Determine where to go back based on current view
+    if (view === 'newsCategories') {
+      setView('mainSelection');
+    } else if (view === 'articles' || view === 'newspaperView' || view === 'newspaperLoading') {
+      setView('newsCategories');
+    } else if (view === 'departmentSelection') {
+      setView('mainSelection');
+    } else if (view === 'cpoRoleSetup') {
+      setView('departmentSelection');
+    } else if (view === 'cpoRoleChat' || view === 'cpoChatPrint') {
+      setView('cpoRoleSetup');
+    } else {
+      setView('mainSelection');
+    }
+    
     setSelectedCategory(null);
     setArticles([]);
     setNewspaperArticles([]);
@@ -909,6 +963,7 @@ const App: React.FC = () => {
   const t = {
     nl: {
       backToCategories: 'Terug naar categorieën',
+      backToMain: 'Terug naar hoofdmenu',
       generateNewspaper: 'Maak Krant van deze Categorie',
       listenPodcast: 'Luister Podcast',
       stopPodcast: 'Stop Podcast',
@@ -920,10 +975,15 @@ const App: React.FC = () => {
       footer: 'Mogelijk gemaakt door de verschillende Gemini AI-modellen',
       resetSettings: 'Reset instellingen & cookies',
       speakingWith: 'In gesprek met de',
-      expert: 'Expert'
+      expert: 'Expert',
+      welcomeMessage: 'Welkom bij Exact\'s Daily!',
+      continueChat: 'Ga verder met de vorige chat',
+      loadMemory: 'Chat laden',
+      askSuggestedQuestion: 'Stel deze vraag'
     },
     en: {
       backToCategories: 'Back to categories',
+      backToMain: 'Back to Main',
       generateNewspaper: 'Create Newspaper from this Category',
       listenPodcast: 'Listen to Podcast',
       stopPodcast: 'Stop Podcast',
@@ -935,10 +995,15 @@ const App: React.FC = () => {
       footer: 'Powered by the different Gemini AI models',
       resetSettings: 'Reset settings & cookies',
       speakingWith: 'Speaking with the',
-      expert: 'Expert'
+      expert: 'Expert',
+      welcomeMessage: 'Welcome to Exact\'s Daily!',
+      continueChat: 'Continue Previous Chat',
+      loadMemory: 'Load Chat',
+      askSuggestedQuestion: 'Ask this question'
     },
     de: {
       backToCategories: 'Zurück zu den Kategorien',
+      backToMain: 'Zurück zum Hauptmenü',
       generateNewspaper: 'Zeitung aus dieser Kategorie erstellen',
       listenPodcast: 'Podcast anhören',
       stopPodcast: 'Podcast stoppen',
@@ -950,27 +1015,69 @@ const App: React.FC = () => {
       footer: 'Angetrieben durch die verschiedenen Gemini AI-Modelle',
       resetSettings: 'Einstellungen & Cookies zurücksetzen',
       speakingWith: 'Im Gespräch mit dem',
-      expert: 'Experten'
+      expert: 'Experten',
+      welcomeMessage: 'Willkommen bei Exact\'s Daily!',
+      continueChat: 'Fortsetzen Sie die vorherige Chat-Sitzung',
+      loadMemory: 'Chat laden',
+      askSuggestedQuestion: 'Diese Frage stellen'
     }
   }
 
   const renderCategoryView = () => (
-    <div className="mt-12">
-      <div className="grid lg:grid-cols-6 gap-6 mb-6">
-        <div className="lg:col-span-5">
-            <NewspaperGeneratorCard 
-              onGenerate={handleGenerateFrontPage} 
-              isDisabled={favoriteCategories.size < 1}
-              language={language}
-              favoriteCategories={CATEGORIES.filter(c => favoriteCategories.has(c.key))}
-            />
-        </div>
-        <div className="lg:col-span-1">
-          <InfoCard onShowInfo={handleShowInfo} language={language} />
-        </div>
+    <div className="space-y-8">
+      {/* Back Button */}
+      <div className="flex justify-start">
+        <button 
+          onClick={handleGoBackToMain}
+          className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-slate-200/50 dark:bg-gray-700/50 hover:bg-slate-300 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900 focus:ring-indigo-500 transition-colors"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 mr-2" aria-hidden="true">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+          </svg>
+          {t[language].backToMain || 'Back to Main'}
+        </button>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 auto-rows-fr">
-        {CATEGORIES.map(cat => (
+
+      <div className="text-center">
+        <h1 className="text-4xl font-extrabold tracking-tight bg-gradient-to-r from-teal-400 via-blue-500 to-indigo-600 dark:from-teal-300 dark:via-blue-400 dark:to-indigo-500 bg-clip-text text-transparent mb-4">
+          Exact's Daily
+        </h1>
+        <p className="text-xl text-slate-600 dark:text-slate-400 max-w-3xl mx-auto">
+          {t[language].welcomeMessage}
+        </p>
+      </div>
+
+      {/* Memory Load Button */}
+      {userMemory && !memoryLoading && (
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-800 rounded-xl p-6">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <svg className="h-6 w-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+                <div>
+                  <h3 className="text-lg font-semibold text-blue-800 dark:text-blue-200">
+                    {t[language].continueChat || 'Continue Previous Chat'}
+                  </h3>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">
+                    {CATEGORIES.find(cat => cat.key === userMemory.categoryKey)?.title[language] || 'Unknown Category'} - Previous Chat
+                  </p>
+                </div>
+              </div>
+              <button
+
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+              >
+                {t[language].loadMemory || 'Load Chat'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-6xl mx-auto">
+        {CATEGORIES.filter(cat => cat.key !== 'cpo_role').map(cat => (
           <CategoryCard 
              key={cat.key} 
              category={cat} 
@@ -1149,43 +1256,79 @@ const App: React.FC = () => {
     </div>
   );
 
-  const renderExpertChatView = () => (
-    <>
-      <div className="my-6 flex justify-between items-center">
-        <button 
-          onClick={handleGoBack}
-          className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-slate-200/50 dark:bg-gray-700/50 hover:bg-slate-300 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900 focus:ring-indigo-500 transition-colors"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 mr-2" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
-          </svg>
-          {t[language].backToCategories}
-        </button>
-      </div>
-      <div className="mb-8 p-6 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-l-4 border-teal-400 dark:border-teal-500 rounded-r-lg shadow-md">
-        <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">
-          {t[language].speakingWith} {selectedCategory?.title[language]} {t[language].expert}
-        </h2>
-        <blockquote className="mt-2 italic text-slate-600 dark:text-slate-400">
-          "{selectedCategory?.persona?.[language]}"
-        </blockquote>
-      </div>
+  const renderExpertChatView = () => {
+    // Determine if we're in AI Buddy mode (has selectedDepartment) or News mode
+    const isAIBuddyMode = selectedDepartment !== null;
+    
+    return (
+      <>
+        <div className="my-6 flex justify-between items-center">
+          <button 
+            onClick={handleGoBack}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm font-medium rounded-md text-slate-700 dark:text-slate-300 bg-slate-200/50 dark:bg-gray-700/50 hover:bg-slate-300 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-100 dark:focus:ring-offset-gray-900 focus:ring-indigo-500 transition-colors"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5 mr-2" aria-hidden="true">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" />
+            </svg>
+            {t[language].backToCategories}
+          </button>
+        </div>
+        <div className="mb-8 p-6 bg-white/50 dark:bg-gray-800/50 backdrop-blur-sm border-l-4 border-teal-400 dark:border-teal-500 rounded-r-lg shadow-md">
+          <h2 className="text-xl font-bold text-slate-800 dark:text-slate-200">
+            {t[language].speakingWith} {selectedCategory?.title[language]} {t[language].expert}
+          </h2>
+          <blockquote className="mt-2 italic text-slate-600 dark:text-slate-400">
+            "{selectedCategory?.persona?.[language]}"
+          </blockquote>
+        </div>
 
-      {chatSession && (
-        <ChatView 
-          history={chatHistory} 
-          onSendMessage={handleSendMessage}
-          isLoading={isChatLoading}
-          language={language}
-          selectedCategory={selectedCategory}
-          isExpertMode={true}
-          feedbacks={{}}
-          onSetFeedback={() => {}}
-          onDeleteMessage={() => {}}
-        />
-      )}
-    </>
-  );
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Chat Panel */}
+          <div className="lg:col-span-2">
+            {chatSession && (
+              <ChatView 
+                history={chatHistory} 
+                onSendMessage={handleSendMessage}
+                isLoading={isChatLoading}
+                language={language}
+                selectedCategory={selectedCategory}
+                isExpertMode={true}
+                feedbacks={{}}
+                onSetFeedback={() => {}}
+                onDeleteMessage={() => {}}
+
+                showMemoryButton={true}
+              />
+            )}
+          </div>
+
+          {/* Summary & Actions Panel */}
+          <div className="lg:col-span-1">
+            <SummaryActionsPanel
+              summary={chatSummary}
+              isLoading={isSummaryPanelLoading}
+              language={language}
+              isCollapsed={false}
+              onToggleCollapse={() => {}}
+            />
+            
+            {/* Suggested Question */}
+            {chatSummary?.suggestedQuestion && !isChatLoading && (
+              <div className="mt-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                <p className="text-sm italic text-amber-700 dark:text-amber-300 mb-3">"{chatSummary.suggestedQuestion}"</p>
+                <button
+                  onClick={() => handleAskSuggestedQuestion(chatSummary.suggestedQuestion)}
+                  className="w-full px-3 py-2 bg-amber-600 text-white text-sm font-medium rounded-md hover:bg-amber-700 transition-colors"
+                >
+                  {t[language].askSuggestedQuestion || 'Ask this question'}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </>
+    );
+  };
 
   const renderInfoView = () => (
     <InfoView onGoBack={handleGoBack} language={language} />
@@ -1193,11 +1336,31 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch(view) {
-      case 'categories': return renderCategoryView();
+      case 'mainSelection': 
+        return <MainSelectionView 
+          language={language} 
+          onSelectNews={handleSelectNews} 
+          onSelectAIBuddy={handleSelectAIBuddy} 
+        />;
+      case 'newsCategories': return renderCategoryView();
+      case 'departmentSelection': 
+        return <DepartmentSelectionView 
+          language={language} 
+          onSelectDepartment={handleSelectDepartment} 
+          onGoBack={handleGoBackToMain} 
+        />;
       case 'articles': return renderArticleView();
       case 'expertChat': return renderExpertChatView();
-      case 'cpoRoleSetup': return <CpoRoleSetupView categories={CATEGORIES.filter(c => c.key !== 'exact_news' && c.key !== 'cpo_role' && c.key !== 'ai' && c.key !== 'competitors')} roles={ROLES} onStartChat={handleStartCpoChat} onGoBack={handleGoBack} language={language} />;
-      case 'cpoRoleChat': return <CpoRoleChatView onGoBack={handleReturnToCpoSetup} language={language} selectedCategory={selectedCpoCategory} selectedRole={selectedRole} chatHistory={chatHistory} onSendMessage={handleSendCpoMessage} onAskSuggestedQuestion={handleAskSuggestedQuestion} isChatLoading={isChatLoading} chatSummary={chatSummary} isSummaryPanelLoading={isSummaryPanelLoading} roles={ROLES} onSwitchRole={handleSwitchCpoRole} onPrint={handlePrintCpoChat} isAdvancedMode={isAdvancedMode} onToggleAdvancedMode={handleToggleAdvancedMode} userContext={userContext} onSetUserContext={setUserContext} feedbacks={messageFeedbacks} onSetFeedback={handleSetMessageFeedback} onDeleteMessage={handleDeleteMessage} onGenerateInfographic={handleGenerateInfographic} isInfographicLoading={isInfographicLoading} infographicImage={infographicImage} showInfographicModal={showInfographicModal} onSetShowInfographicModal={setShowInfographicModal} infographicGenerationCount={infographicGenerationCount} includeInfographicInReport={includeInfographicInReport} onSetIncludeInfographicInReport={setIncludeInfographicInReport} summaryPodcastCount={summaryPodcastCount} onIncrementSummaryPodcastCount={() => setSummaryPodcastCount(p => p + 1)} actionsPodcastCount={actionsPodcastCount} onIncrementActionsPodcastCount={() => setActionsPodcastCount(p => p + 1)} onGenerateReadingTable={handleGenerateReadingTable} isReadingLinksLoading={isReadingLinksLoading} readingLinks={readingLinks} onGenerateBooks={handleGenerateBooks} isBooksLoading={isBooksLoading} books={books} onGenerateTedTalks={handleGenerateTedTalks} isTedTalksLoading={isTedTalksLoading} tedTalks={tedTalks} onGenerateLinkedInCourses={handleGenerateLinkedInCourses} isLinkedInCoursesLoading={isLinkedInCoursesLoading} linkedInCourses={linkedInCourses} />;
+      case 'cpoRoleSetup': 
+        return <CpoRoleSetupView 
+          categories={CATEGORIES.filter(c => c.key !== 'exact_news' && c.key !== 'cpo_role' && c.key !== 'ai' && c.key !== 'competitors')} 
+          roles={selectedDepartment?.roles || ROLES} 
+          onStartChat={handleStartCpoChat} 
+          onGoBack={handleGoBackToDepartments} 
+          language={language} 
+          selectedDepartment={selectedDepartment}
+        />;
+      case 'cpoRoleChat': return <CpoRoleChatView onGoBack={handleReturnToCpoSetup} language={language} selectedCategory={selectedCpoCategory} selectedRole={selectedRole} chatHistory={chatHistory} onSendMessage={handleSendCpoMessage} onAskSuggestedQuestion={handleAskSuggestedQuestion} isChatLoading={isChatLoading} chatSummary={chatSummary} isSummaryPanelLoading={isSummaryPanelLoading} roles={selectedDepartment?.roles || ROLES} onSwitchRole={handleSwitchCpoRole} onPrint={handlePrintCpoChat} isAdvancedMode={isAdvancedMode} onToggleAdvancedMode={handleToggleAdvancedMode} userContext={userContext} onSetUserContext={setUserContext} feedbacks={messageFeedbacks} onSetFeedback={handleSetMessageFeedback} onDeleteMessage={handleDeleteMessage} onGenerateInfographic={handleGenerateInfographic} isInfographicLoading={isInfographicLoading} infographicImage={infographicImage} showInfographicModal={showInfographicModal} onSetShowInfographicModal={setShowInfographicModal} infographicGenerationCount={infographicGenerationCount} includeInfographicInReport={includeInfographicInReport} onSetIncludeInfographicInReport={setIncludeInfographicInReport} summaryPodcastCount={summaryPodcastCount} onIncrementSummaryPodcastCount={() => setSummaryPodcastCount(p => p + 1)} actionsPodcastCount={actionsPodcastCount} onIncrementActionsPodcastCount={() => setActionsPodcastCount(p => p + 1)} onGenerateReadingTable={handleGenerateReadingTable} isReadingLinksLoading={isReadingLinksLoading} readingLinks={readingLinks} onGenerateBooks={handleGenerateBooks} isBooksLoading={isBooksLoading} books={books} onGenerateTedTalks={handleGenerateTedTalks} isTedTalksLoading={isTedTalksLoading} tedTalks={tedTalks} onGenerateLinkedInCourses={handleGenerateLinkedInCourses} isLinkedInCoursesLoading={isLinkedInCoursesLoading} linkedInCourses={linkedInCourses} />;
       case 'cpoChatPrint': return <CpoChatPrintView onClose={() => setView('cpoRoleChat')} language={language} selectedCategory={selectedCpoCategory} selectedRole={selectedRole} chatHistory={chatHistory} chatSummary={chatSummary} userContext={userContext} infographicImage={infographicImage} includeInfographicInReport={includeInfographicInReport} books={books} readingLinks={readingLinks} tedTalks={tedTalks} feedbacks={messageFeedbacks} linkedInCourses={linkedInCourses} />;
       case 'info': return renderInfoView();
       case 'newspaperLoading': return renderNewspaperLoadingView();
@@ -1211,43 +1374,64 @@ const App: React.FC = () => {
     }
   }
 
-  if (!isAuthenticated) {
-    return <LoginScreen onLogin={handleLoginAttempt} language={language} />;
-  }
+
+
+  const checkUserMemory = useCallback(async () => {
+    if (!auth.currentUser) return;
+    
+    setMemoryLoading(true);
+    try {
+      const memory = await loadChatMemory(auth.currentUser.uid);
+      setUserMemory(memory);
+    } catch (error) {
+      console.error('Error checking user memory:', error);
+    } finally {
+      setMemoryLoading(false);
+    }
+  }, []);
+
+  // Check for user memory on component mount
+  useEffect(() => {
+    checkUserMemory();
+  }, [checkUserMemory]);
 
   return (
-    <div className="min-h-screen bg-transparent text-slate-800 dark:text-slate-200 font-sans">
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <Header 
-          onGoHome={handleGoBack}
-          selectedCategory={selectedCategory ?? selectedCpoCategory} 
-          isNewspaperView={view === 'newspaperView' || view === 'newspaperLoading'}
-          isExpertChatView={view === 'expertChat'}
-          isInfoView={view === 'info'}
-          isCpoSetupView={view === 'cpoRoleSetup'}
-          isCpoChatView={view === 'cpoRoleChat'}
-          language={language}
-          theme={theme}
-          toggleTheme={toggleTheme}
-          handleSetLanguage={handleSetLanguage}
-        />
-        {renderContent()}
-      </main>
-      <footer className="text-center py-6 text-slate-500 text-sm">
-        <p>{t[language].footer} &bull; v0.75</p>
-        <button
-          onClick={handleResetSettings}
-          className="mt-2 text-xs text-slate-500 hover:text-red-500 dark:hover:text-red-400 underline transition-colors"
-        >
-          {t[language].resetSettings}
-        </button>
-      </footer>
-       <CookieConsentToast 
-         isVisible={showCookieToast}
-         onAccept={handleAcceptCookies}
-         language={language}
-       />
-    </div>
+    <AuthWrapper language={language} setLanguage={handleSetLanguage} theme={theme} toggleTheme={toggleTheme}>
+      <div className="min-h-screen bg-transparent text-slate-800 dark:text-slate-200 font-sans">
+        <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <Header 
+            onGoHome={handleGoBack}
+            selectedCategory={selectedCategory ?? selectedCpoCategory} 
+            isNewspaperView={view === 'newspaperView' || view === 'newspaperLoading'}
+            isExpertChatView={view === 'expertChat'}
+            isInfoView={view === 'info'}
+            isCpoSetupView={view === 'cpoRoleSetup'}
+            isCpoChatView={view === 'cpoRoleChat'}
+            isMainSelectionView={view === 'mainSelection'}
+            isDepartmentSelectionView={view === 'departmentSelection'}
+            language={language}
+            theme={theme}
+            toggleTheme={toggleTheme}
+            handleSetLanguage={handleSetLanguage}
+          />
+          {renderContent()}
+        </main>
+        <footer className="text-center py-6 text-slate-500 text-sm">
+          <p>{t[language].footer} &bull; v0.76</p>
+          <button
+            onClick={handleResetSettings}
+            className="mt-2 text-xs text-slate-500 hover:text-red-500 dark:hover:text-red-400 underline transition-colors"
+          >
+            {t[language].resetSettings}
+          </button>
+        </footer>
+         <CookieConsentToast 
+           isVisible={showCookieToast}
+           onAccept={handleAcceptCookies}
+           language={language}
+         />
+      </div>
+    </AuthWrapper>
   );
 };
 

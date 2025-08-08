@@ -24,8 +24,8 @@ const sanitizeText = (text: string): string => {
     // Remove markdown-like formatting that shouldn't be read
     sanitized = sanitized.replace(/(\*\*|__|\*|_)/g, '');
     // Replace "smart" quotes and other special characters with standard ones
-    sanitized = sanitized.replace(/[“”]/g, '"');
-    sanitized = sanitized.replace(/[‘’]/g, "'");
+    sanitized = sanitized.replace(/[""]/g, '"');
+    sanitized = sanitized.replace(/['']/g, "'");
     // Remove characters that can cause issues, like vertical tabs.
     sanitized = sanitized.replace(/[\x0B]/g, ' ');
     return sanitized.trim();
@@ -35,15 +35,11 @@ const chunkText = (text: string): string[] => {
     if (!text) return [];
 
     const chunks: string[] = [];
-    // A conservative maxLength to enhance stability across all browsers/voices.
-    const maxLength = 120;
+    // Reduced maxLength to prevent mid-sentence pauses
+    const maxLength = 80;
 
-    // Split by common sentence terminators, but keep the terminator.
-    const sentences = text.match(/[^.!?]+[.!?]*|[^.!?]+$/g);
-
-    if (!sentences) {
-        return [];
-    }
+    // Split by sentence terminators, but be more careful about abbreviations
+    const sentences = text.split(/(?<=[.!?])\s+/);
 
     sentences.forEach(sentence => {
         const trimmedSentence = sentence.trim();
@@ -52,23 +48,34 @@ const chunkText = (text: string): string[] => {
         if (trimmedSentence.length <= maxLength) {
             chunks.push(trimmedSentence);
         } else {
-            // If a sentence is too long, chunk it by words
-            let currentChunk = '';
-            const words = trimmedSentence.split(/\s+/);
-            words.forEach(word => {
-                const chunkWithWord = currentChunk ? `${currentChunk} ${word}` : word;
-                if (chunkWithWord.length > maxLength) {
+            // If a sentence is too long, try to split by natural breaks
+            const naturalBreaks = trimmedSentence.split(/(?<=[,;:])\s+/);
+            
+            naturalBreaks.forEach(breakPart => {
+                if (breakPart.length <= maxLength) {
+                    chunks.push(breakPart);
+                } else {
+                    // If still too long, split by words but try to keep phrases together
+                    const words = breakPart.split(/\s+/);
+                    let currentChunk = '';
+                    
+                    words.forEach(word => {
+                        const chunkWithWord = currentChunk ? `${currentChunk} ${word}` : word;
+                        if (chunkWithWord.length > maxLength) {
+                            if (currentChunk.length > 0) {
+                                chunks.push(currentChunk);
+                            }
+                            currentChunk = word;
+                        } else {
+                            currentChunk = chunkWithWord;
+                        }
+                    });
+                    
                     if (currentChunk.length > 0) {
                         chunks.push(currentChunk);
                     }
-                    currentChunk = word;
-                } else {
-                    currentChunk = chunkWithWord;
                 }
             });
-            if (currentChunk.length > 0) {
-                chunks.push(currentChunk);
-            }
         }
     });
 
@@ -132,7 +139,7 @@ export const useTextToSpeech = ({ language, onBoundary, onEnd }: TextToSpeechOpt
       utterance.voice = selectedVoice;
     }
 
-    utterance.rate = 0.95;
+    utterance.rate = 0.9; // Slightly slower for better clarity
     utterance.pitch = 1;
 
     utterance.onstart = () => {
@@ -152,8 +159,8 @@ export const useTextToSpeech = ({ language, onBoundary, onEnd }: TextToSpeechOpt
 
     utterance.onend = () => {
       isProcessingRef.current = false;
-      // Short delay to allow the speech engine to settle before the next utterance.
-      setTimeout(() => processQueue(), 100); 
+      // Longer delay to allow the speech engine to settle before the next utterance.
+      setTimeout(() => processQueue(), 200); 
     };
     
     utterance.onerror = (event) => {

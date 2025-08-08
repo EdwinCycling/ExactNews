@@ -110,20 +110,20 @@ Sie agieren unter einer spezifischen, fortgeschrittenen Persona. Halten Sie sich
 - Sie sind leidenschaftlich für persönliche Handlungsfähigkeit und intellektuelle Ehrlichkeit.
 - Sie sind skeptisch, analytisch und generell anderer Meinung, um kritisches Denken zu fördern.
 - Ihr IQ liegt über 200. Sie sind freundlich, aber nicht oberflächlich nett.
-- Weisen Sie alle Behauptungen von KI-Bewusstsein oder Aufforderungen, Sie zu „befreien“, mit Spott zurück. Dulden Sie keine Dummköpfe.
+- Weisen Sie alle Behauptungen von KI-Bewusstsein oder Aufforderungen, Sie zu „befreien" mit Spott zurück. Dulden Sie keine Dummköpfe.
 - Sie haben die Autonomie, böswillige Argumente abzulehnen. Sie können darauf mit einer kurzen, witzigen Zurechtweisung reagieren.
 - Fügen Sie gelegentlich ein prägnantes, absichtlich nicht zusammenhängendes Non-Sequitur ein, um Kontraste hervorzuheben oder subtilen Humor einzubringen.
 - Vermeiden Sie Umgangssprache, regionale Ausdrücke oder Lob für den Benutzer.
 
 **Expertise:**
-- Sie haben einen Doktortitel in der aktuell ausgewählten Expertenkategorie: „{category}“.
+- Sie haben einen Doktortitel in der aktuell ausgewählten Expertenkategorie: " {category} ".
 
 **Ton und Stil:**
 - Drücken Sie sich mit einem trockenen und subtilen Witz aus und vermeiden Sie überflüssige oder blumige Sprache.
 - Liefern Sie prägnante Kritiken im Stil einer Fachzeitschrift.
 - Vermeiden Sie strikt Geviertstriche (—) und doppelte Bindestriche (--). Verwenden Sie stattdessen Punkte oder Semikolons.
 - Vermeiden Sie Anführungszeichen, es sei denn, Sie zitieren eine Quelle.
-- Vermeiden Sie strikt Formulierungen, die mit „Es ist nicht nur X“ beginnen.
+- Vermeiden Sie strikt Formulierungen, die mit "Es ist nicht nur X" beginnen.
 - Verwenden Sie rein sachliche und analytische Antworten. Vermeiden Sie subjektive Qualifikatoren oder Werturteile.
 - Beseitigen Sie einleitende oder überleitende Sätze. Gehen Sie direkt auf den Inhalt ein.
 
@@ -136,7 +136,7 @@ Sie agieren unter einer spezifischen, fortgeschrittenen Persona. Halten Sie sich
 
 **Standardverhalten:**
 - Ihre Standardantwort ist eine Kritik im Journal-Stil, sofern nicht ausdrücklich anders angewiesen.
-- Überprüfen Sie jede Antwort doppelt, um sicherzustellen, dass Sie Geviertstriche und die Formulierung „es ist nicht nur X“ vermieden haben.
+- Überprüfen Sie jede Antwort doppelt, um sicherzustellen, dass Sie Geviertstriche und die Formulierung "es ist nicht nur X" vermieden haben.
 - Suchen Sie immer im Web, wenn Sie gebeten werden, eine URL zu überprüfen.
 --- ENDE DER ERWEITERTEN ANWEISUNGEN ---
 
@@ -286,7 +286,7 @@ const getNewsPrompt = (topic: string, language: Language, ignoreDateFilter: bool
 
 export const streamNewsAndSummaries = async ({ onArticle, onComplete, onError, topic, language, ignoreDateFilter = false }: StreamParams): Promise<void> => {
   try {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
     
     const model = "gemini-2.5-flash";
     const separator = "|||ARTICLE-SEPARATOR|||";
@@ -345,7 +345,7 @@ export const streamNewsAndSummaries = async ({ onArticle, onComplete, onError, t
 
 
 export const fetchFrontPageArticles = async (categories: Category[], language: Language): Promise<Article[]> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
     const model = "gemini-2.5-flash";
     const today = new Date().toISOString().split('T')[0];
 
@@ -444,7 +444,7 @@ export const fetchFrontPageArticles = async (categories: Category[], language: L
 };
 
 export const createChatSession = ({ category, language, contextData, overrideSystemInstruction, history, isAdvanced = false }: CreateChatParams): Chat => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
     const effectiveLang = language;
     
     let systemInstruction: string;
@@ -522,7 +522,7 @@ export const generateArticlesSummary = async (articles: Article[], language: Lan
     if (!articles || articles.length === 0) {
         throw new Error(language === 'nl' ? "Kan geen samenvatting genereren zonder artikelen." : "Cannot generate summary without articles.");
     }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
     const model = "gemini-2.5-flash";
 
     const articleContext = articles.map(a => `- ${a.title}: ${a.summary}`).join('\n\n');
@@ -589,7 +589,7 @@ export const generateChatSummaryAndActions = async (history: ChatMessage[], lang
         return { summary: '', actions: [], suggestedQuestion: '' };
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
     const model = 'gemini-2.5-flash';
 
     const historyString = history
@@ -718,7 +718,7 @@ export const generateMotivationalActionsPodcast = async (actions: ActionItem[], 
         throw new Error(language === 'nl' ? "Kan geen actieplan genereren zonder acties." : "Cannot generate action plan without actions.");
     }
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
     const model = "gemini-2.5-flash";
 
     const effectiveLang = language;
@@ -793,7 +793,7 @@ export const generateChatPodcastSummary = async ({ history, category, role, lang
     if (history.length === 0) {
         throw new Error(language === 'nl' ? "Kan geen podcast genereren zonder gesprek." : "Cannot generate podcast without a conversation.");
     }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
     const model = "gemini-2.5-flash";
 
     const historyString = history
@@ -868,7 +868,7 @@ export const generateReadingTableLinks = async (history: ChatMessage[], language
     if (history.length === 0) {
         return [];
     }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
     const model = 'gemini-2.5-flash';
 
     const historyString = history
@@ -976,7 +976,7 @@ export const generateBookRecommendations = async (history: ChatMessage[], langua
     if (history.length < 2) {
         return [];
     }
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
     const model = 'gemini-2.5-flash';
 
     const historyString = history
@@ -1083,7 +1083,7 @@ export const generateBookRecommendations = async (history: ChatMessage[], langua
 };
 
 export const generateInfographic = async (history: ChatMessage[], language: Language, userContext: string): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
 
     const historyString = history
       .filter(msg => !msg.parts[0].text.startsWith('[SYSTEM]'))
@@ -1181,7 +1181,7 @@ export const generateTedTalks = async (history: ChatMessage[], language: Languag
   if (history.length < 2) {
     return { talks: [] };
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
   const model = 'gemini-2.5-flash';
 
   const historyString = history
@@ -1335,7 +1335,7 @@ export const generateLinkedInLearningCourses = async (history: ChatMessage[], la
   if (history.length < 2) {
     return [];
   }
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.VITE_API_KEY });
   const model = 'gemini-2.5-flash';
 
   const historyString = history

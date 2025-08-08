@@ -25,6 +25,13 @@ export interface RoleTemplate {
   text: { [key in Language]: string };
 }
 
+export interface Department {
+  key: string;
+  title: { [key in Language]: string };
+  description: { [key in Language]: string };
+  roles: RoleTemplate[];
+}
+
 export interface ActionItem {
   text: string;
   priority: 'High' | 'Medium' | 'Low';
@@ -75,4 +82,14 @@ export interface LinkedInLearningCourse {
   title: string;
   description: string;
   url: string;
+}
+
+export interface ChatMemory {
+  id: string;
+  userId: string;
+  extensiveSummary: string; // Detailed summary to give AI a starting point for a new chat
+  categoryKey: string; // Only store the category key, not the full object
+  roleKey?: string; // Only store the role key, not the full object
+  createdAt: string;
+  updatedAt: string;
 }

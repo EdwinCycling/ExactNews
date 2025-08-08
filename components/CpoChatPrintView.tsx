@@ -144,9 +144,8 @@ const CpoChatPrintView: React.FC<CpoChatPrintViewProps> = ({
 
   return (
     <div className="bg-slate-100 dark:bg-gray-900">
-        <div className="max-w-4xl mx-auto py-8 font-sans px-4 sm:px-6 lg:px-8">
+        <div className="w-full py-8 font-sans px-4 sm:px-6 lg:px-8">
             <div className="mb-8 flex flex-wrap justify-between items-center gap-4 no-print">
-                <h1 className="text-3xl font-bold text-slate-800 dark:text-slate-200">{t[language].title}</h1>
                 <div className="flex gap-4">
                 <button
                     onClick={onClose}

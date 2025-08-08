@@ -11,6 +11,8 @@ interface HeaderProps {
   isInfoView?: boolean;
   isCpoSetupView?: boolean;
   isCpoChatView?: boolean;
+  isMainSelectionView?: boolean;
+  isDepartmentSelectionView?: boolean;
   language: Language;
   theme: string;
   toggleTheme: () => void;
@@ -24,7 +26,9 @@ const Header: React.FC<HeaderProps> = ({
     isExpertChatView, 
     isInfoView,
     isCpoSetupView,
-    isCpoChatView, 
+    isCpoChatView,
+    isMainSelectionView,
+    isDepartmentSelectionView,
     language, 
     theme, 
     toggleTheme, 
@@ -67,7 +71,7 @@ const Header: React.FC<HeaderProps> = ({
     subtitle = t[language].categorySubtitle(selectedCategory.title[language]);
   }
 
-  const hideSubtitle = isExpertChatView || isInfoView;
+  const hideSubtitle = isExpertChatView || isInfoView || isMainSelectionView || isDepartmentSelectionView;
 
   return (
     <header className="text-center mb-8">
